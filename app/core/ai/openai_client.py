@@ -124,6 +124,7 @@ class OpenAIClient(BaseAIClient):
             self._save_debug_prompt(prompt, timestamp)
             
             try:
+                # Увеличиваем таймаут для запроса через прокси
                 response = client.chat.completions.create(
                     model=self.model,
                     messages=[
@@ -135,7 +136,8 @@ class OpenAIClient(BaseAIClient):
                             "role": "user",
                             "content": prompt
                         }
-                    ]
+                    ],
+                    timeout=120.0  # Увеличенный таймаут для прокси
                 )
             finally:
                 # Восстанавливаем старые значения переменных окружения
