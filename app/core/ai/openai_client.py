@@ -128,7 +128,7 @@ class OpenAIClient(BaseAIClient):
                             "content": prompt
                         }
                     ],
-                    timeout=120.0  # Увеличенный таймаут для прокси
+                    timeout=1200.0  # Таймаут 20 минут
                 )
             finally:
                 # Восстанавливаем старые значения переменных окружения
