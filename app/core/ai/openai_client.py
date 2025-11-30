@@ -89,35 +89,26 @@ class OpenAIClient(BaseAIClient):
         
         try:
             # Настройка клиента OpenAI с поддержкой прокси
-            client_kwargs = {'api_key': self.api_key}
+            # Используем только переменные окружения - httpx подхватит их автоматически
+            old_http_proxy = None
+            old_https_proxy = None
             
             if self.proxy:
-                # Устанавливаем переменные окружения ДО создания клиента
-                # httpx (который использует openai) автоматически подхватит их
+                # Сохраняем старые значения
                 old_http_proxy = os.environ.get('HTTP_PROXY')
                 old_https_proxy = os.environ.get('HTTPS_PROXY')
                 
-                # Устанавливаем переменные окружения для httpx
+                # Устанавливаем переменные окружения ДО создания клиента
+                # httpx (который использует openai) автоматически подхватит их
                 os.environ['HTTP_PROXY'] = self.proxy
                 os.environ['HTTPS_PROXY'] = self.proxy
-                
-                # Также создаем http_client явно для более надежной работы
-                try:
-                    import httpx
-                    # Используем правильный синтаксис для httpx (проверено для версии 0.24+)
-                    http_client = httpx.Client(
-                        proxies=self.proxy,  # Для httpx >= 0.24 можно передать строку напрямую
-                        timeout=120.0  # Увеличиваем таймаут для прокси
-                    )
-                    # Пробуем передать http_client (работает в openai >= 1.0)
-                    client_kwargs['http_client'] = http_client
-                except (ImportError, TypeError, Exception) as e:
-                    # Если не поддерживается, используем только переменные окружения
-                    # Переменные окружения должны работать автоматически
-                    pass
+                # Также пробуем альтернативные переменные
+                os.environ['http_proxy'] = self.proxy
+                os.environ['https_proxy'] = self.proxy
             
             # Создаем клиент OpenAI
-            client = openai.OpenAI(**client_kwargs)
+            # Переменные окружения будут автоматически использованы httpx
+            client = openai.OpenAI(api_key=self.api_key)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             
             # Сохраняем промпт для отладки
