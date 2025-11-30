@@ -21,3 +21,6 @@ openai>=1.0.0
 # HTTP requests (для Jay Flow API)
 requests>=2.31.0
 
+# HTTP клиент для прокси (для OpenAI)
+httpx>=0.24.0
+

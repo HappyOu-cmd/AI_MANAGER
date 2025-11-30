@@ -13,19 +13,25 @@ from pathlib import Path
 from datetime import datetime
 
 from app.core.ai.base import BaseAIClient
+from app.config import Config
 
 
 class OpenAIClient(BaseAIClient):
     """Клиент для работы с OpenAI API"""
     
-    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-5"):
+    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-5", proxy: Optional[str] = None):
         """
         Args:
             api_key: API ключ OpenAI
             model: Модель для использования
+            proxy: Прокси сервер (опционально). Формат: http://host:port или http://user:pass@host:port
         """
         self.model = model
         self.base_url = "https://api.openai.com/v1"
+        
+        # Настройка прокси
+        # Приоритет: 1) параметр proxy, 2) переменная окружения, 3) конфигурация
+        self.proxy = proxy or os.environ.get('OPENAI_PROXY') or getattr(Config, 'OPENAI_PROXY', None)
         
         # Папки для отладочных файлов
         project_root = Path(__file__).parent.parent.parent.parent
@@ -82,7 +88,29 @@ class OpenAIClient(BaseAIClient):
             }
         
         try:
-            client = openai.OpenAI(api_key=self.api_key)
+            # Настройка клиента с прокси, если указан
+            client_kwargs = {'api_key': self.api_key}
+            
+            if self.proxy:
+                # OpenAI библиотека поддерживает прокси через http_client
+                try:
+                    import httpx
+                    # Создаем HTTP клиент с прокси
+                    http_client = httpx.Client(
+                        proxies={
+                            'http://': self.proxy,
+                            'https://': self.proxy
+                        },
+                        timeout=60.0
+                    )
+                    client_kwargs['http_client'] = http_client
+                except ImportError:
+                    # Если httpx не установлен, используем переменные окружения
+                    # Это работает для некоторых версий библиотеки openai
+                    os.environ['HTTP_PROXY'] = self.proxy
+                    os.environ['HTTPS_PROXY'] = self.proxy
+            
+            client = openai.OpenAI(**client_kwargs)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             
             # Сохраняем промпт для отладки

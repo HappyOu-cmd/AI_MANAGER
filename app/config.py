@@ -41,6 +41,11 @@ class Config:
     DEFAULT_AI_PROVIDER = 'openai'
     SUPPORTED_AI_PROVIDERS = ['openai', 'jayflow']
     
+    # Прокси для OpenAI (опционально)
+    # Формат: http://username:password@proxy-host:port или http://proxy-host:port
+    # Можно установить через переменную окружения OPENAI_PROXY
+    OPENAI_PROXY = os.environ.get('OPENAI_PROXY', None)
+    
     # Настройки Flask
     JSON_AS_ASCII = False
     JSONIFY_PRETTYPRINT_REGULAR = True
