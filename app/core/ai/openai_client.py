@@ -88,24 +88,36 @@ class OpenAIClient(BaseAIClient):
             }
         
         try:
-            # Настройка прокси через переменные окружения
-            # OpenAI библиотека использует httpx, который автоматически подхватывает
-            # переменные окружения HTTP_PROXY и HTTPS_PROXY
-            old_http_proxy = None
-            old_https_proxy = None
+            # Настройка клиента OpenAI с поддержкой прокси
+            client_kwargs = {'api_key': self.api_key}
             
             if self.proxy:
-                # Сохраняем старые значения
+                # Устанавливаем переменные окружения ДО создания клиента
+                # httpx (который использует openai) автоматически подхватит их
                 old_http_proxy = os.environ.get('HTTP_PROXY')
                 old_https_proxy = os.environ.get('HTTPS_PROXY')
                 
-                # Устанавливаем прокси для этого запроса
                 os.environ['HTTP_PROXY'] = self.proxy
                 os.environ['HTTPS_PROXY'] = self.proxy
+                
+                # Также создаем http_client явно для более надежной работы
+                try:
+                    import httpx
+                    http_client = httpx.Client(
+                        proxies={
+                            'http://': self.proxy,
+                            'https://': self.proxy
+                        },
+                        timeout=120.0  # Увеличиваем таймаут для прокси
+                    )
+                    # Пробуем передать http_client (работает в openai >= 1.0)
+                    client_kwargs['http_client'] = http_client
+                except (ImportError, TypeError):
+                    # Если не поддерживается, используем только переменные окружения
+                    pass
             
             # Создаем клиент OpenAI
-            # httpx (который использует openai) автоматически подхватит переменные окружения
-            client = openai.OpenAI(api_key=self.api_key)
+            client = openai.OpenAI(**client_kwargs)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             
             # Сохраняем промпт для отладки
