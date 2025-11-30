@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Конвертер документов в текст</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤖 ИИ Менеджер для заполнения ТЗ</h1>
+            <p class="subtitle">Загрузите документ → ИИ заполнит техническое задание</p>
+        </header>
+
+        <main>
+            <div class="upload-section">
+                <div class="upload-box" id="uploadBox">
+                    <div class="upload-icon">📤</div>
+                    <h2>Загрузите ТЗ заказчика</h2>
+                    <p class="formats">Поддерживаемые форматы: PDF, DOC, DOCX, XLS, XLSX, TXT</p>
+                    <p class="process-info">Процесс: Конвертация → Обработка ИИ → Заполненный JSON</p>
+                    
+                    <form id="uploadForm" enctype="multipart/form-data">
+                        <input type="file" id="fileInput" name="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt" required>
+                        <label for="fileInput" class="file-label">
+                            <span class="file-button">Выбрать файл</span>
+                            <span class="file-name" id="fileName">Файл не выбран</span>
+                        </label>
+                        
+                        <div class="ai-selector" style="margin: 20px 0;">
+                            <label for="aiProvider" style="display: block; margin-bottom: 10px; font-weight: bold; color: #333;">
+                                🤖 Выберите AI провайдера:
+                            </label>
+                            <select id="aiProvider" name="ai_provider" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; background: white; cursor: pointer;">
+                                <option value="openai">OpenAI (GPT-5)</option>
+                                <option value="jayflow">Jay Flow</option>
+                            </select>
+                        </div>
+                        
+                        <button type="submit" class="submit-btn" id="submitBtn">
+                            <span class="btn-text">Обработать с помощью ИИ</span>
+                            <span class="btn-loader" id="loader" style="display: none;">⏳</span>
+                        </button>
+                        
+                        <div class="progress-steps" id="progressSteps" style="display: none;">
+                            <div class="step" id="step1">
+                                <span class="step-icon">📄</span>
+                                <span class="step-text">Конвертация документа...</span>
+                            </div>
+                            <div class="step" id="step2">
+                                <span class="step-icon">🔧</span>
+                                <span class="step-text">Построение промпта...</span>
+                            </div>
+                            <div class="step" id="step3">
+                                <span class="step-icon">🤖</span>
+                                <span class="step-text">Обработка ИИ...</span>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="result-section" id="resultSection" style="display: none;">
+                    <div class="result-box success" id="resultBox">
+                        <div class="result-icon">✅</div>
+                        <h3>ТЗ успешно заполнено!</h3>
+                        <p id="resultMessage"></p>
+                        <div class="file-info" id="fileInfo"></div>
+                        <div class="usage-info" id="usageInfo" style="display: none;"></div>
+                        <div class="download-buttons" id="downloadButtons" style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; margin-top: 20px;">
+                            <a href="#" id="downloadJsonLink" class="download-btn" download>
+                                📥 Скачать JSON
+                            </a>
+                            <a href="#" id="downloadExcelLink" class="download-btn" download style="display: none;">
+                                📊 Скачать Excel
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="error-box" id="errorBox" style="display: none;">
+                    <div class="error-icon">❌</div>
+                    <h3>Ошибка</h3>
+                    <p id="errorMessage"></p>
+                </div>
+            </div>
+
+            <div class="info-section">
+                <h3>ℹ️ Как это работает</h3>
+                <ol>
+                    <li><strong>Загрузите документ</strong> с ТЗ заказчика (PDF, Word, Excel)</li>
+                    <li><strong>Автоматическая конвертация</strong> документа в текст</li>
+                    <li><strong>ИИ анализирует</strong> текст и заполняет шаблон JSON</li>
+                    <li><strong>Скачайте результат</strong> - заполненный JSON файл</li>
+                </ol>
+                <h3 style="margin-top: 20px;">📋 Поддерживаемые форматы</h3>
+                <ul>
+                    <li><strong>PDF</strong> - извлекается весь текст</li>
+                    <li><strong>Word (DOCX)</strong> - текст и таблицы</li>
+                    <li><strong>Word (DOC)</strong> - требуется antiword</li>
+                    <li><strong>Excel</strong> - все листы с сохранением структуры</li>
+                    <li><strong>Максимальный размер:</strong> 50 МБ</li>
+                </ul>
+            </div>
+        </main>
+
+        <footer>
+            <p>ИИ Менеджер для выбора станков</p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
+

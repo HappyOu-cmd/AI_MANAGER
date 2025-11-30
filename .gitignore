@@ -1,0 +1,36 @@
+# Виртуальное окружение
+venv/
+env/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Конвертированные файлы
+*_converted.txt
+
+# Веб-приложение
+uploads/
+converted/
+results/
+debug/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Временные файлы
+*.tmp
+*.log
+
+# API ключи
+ApiKey.txt
+key.txt
+JayFlowClientHTTP.txt
+
