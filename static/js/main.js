@@ -72,17 +72,64 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: formData
             });
 
-            const data = await response.json();
+            // Проверяем Content-Type перед парсингом JSON
+            const contentType = response.headers.get('content-type');
+            let data;
+            
+            if (contentType && contentType.includes('application/json')) {
+                // Пытаемся распарсить JSON
+                try {
+                    data = await response.json();
+                } catch (jsonError) {
+                    // Если не удалось распарсить JSON, читаем как текст
+                    const text = await response.text();
+                    console.error('Ошибка парсинга JSON:', jsonError);
+                    console.error('Ответ сервера:', text);
+                    showError('Ошибка сервера: получен неверный формат ответа. Проверьте консоль браузера для деталей.');
+                    return;
+                }
+            } else {
+                // Если ответ не JSON, читаем как текст
+                const text = await response.text();
+                console.error('Сервер вернул не JSON ответ:', text.substring(0, 500));
+                
+                // Пытаемся извлечь информацию об ошибке из HTML
+                let errorMsg = 'Ошибка сервера';
+                if (response.status === 500) {
+                    errorMsg = 'Внутренняя ошибка сервера. Проверьте логи на сервере.';
+                } else if (response.status === 404) {
+                    errorMsg = 'Маршрут не найден. Возможно, сервер не запущен.';
+                } else if (response.status === 413) {
+                    errorMsg = 'Файл слишком большой. Максимальный размер: 50 МБ.';
+                } else if (response.status >= 400) {
+                    errorMsg = `Ошибка ${response.status}: ${response.statusText}`;
+                }
+                
+                showError(errorMsg);
+                return;
+            }
 
             if (response.ok && data.success) {
                 // Завершаем все шаги
                 completeAllSteps();
                 showSuccess(data);
             } else {
-                showError(data.error || 'Произошла ошибка при обработке');
+                // Обрабатываем ошибку из JSON ответа
+                const errorMsg = data.error || data.message || 'Произошла ошибка при обработке';
+                showError(errorMsg);
             }
         } catch (error) {
-            showError('Ошибка сети: ' + error.message);
+            // Обрабатываем сетевые ошибки и ошибки парсинга
+            let errorMsg = 'Ошибка сети: ' + error.message;
+            
+            if (error.message.includes('JSON')) {
+                errorMsg = 'Ошибка парсинга ответа сервера. Возможно, сервер вернул HTML вместо JSON. Проверьте консоль браузера.';
+            } else if (error.message.includes('Failed to fetch')) {
+                errorMsg = 'Не удалось подключиться к серверу. Убедитесь, что сервер запущен.';
+            }
+            
+            console.error('Ошибка запроса:', error);
+            showError(errorMsg);
         } finally {
             // Восстанавливаем кнопку
             submitBtn.disabled = false;
