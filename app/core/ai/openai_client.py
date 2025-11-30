@@ -88,47 +88,55 @@ class OpenAIClient(BaseAIClient):
             }
         
         try:
-            # Настройка клиента с прокси, если указан
-            client_kwargs = {'api_key': self.api_key}
+            # Настройка прокси через переменные окружения
+            # OpenAI библиотека использует httpx, который автоматически подхватывает
+            # переменные окружения HTTP_PROXY и HTTPS_PROXY
+            old_http_proxy = None
+            old_https_proxy = None
             
             if self.proxy:
-                # OpenAI библиотека поддерживает прокси через http_client
-                try:
-                    import httpx
-                    # Создаем HTTP клиент с прокси
-                    http_client = httpx.Client(
-                        proxies={
-                            'http://': self.proxy,
-                            'https://': self.proxy
-                        },
-                        timeout=60.0
-                    )
-                    client_kwargs['http_client'] = http_client
-                except ImportError:
-                    # Если httpx не установлен, используем переменные окружения
-                    # Это работает для некоторых версий библиотеки openai
-                    os.environ['HTTP_PROXY'] = self.proxy
-                    os.environ['HTTPS_PROXY'] = self.proxy
+                # Сохраняем старые значения
+                old_http_proxy = os.environ.get('HTTP_PROXY')
+                old_https_proxy = os.environ.get('HTTPS_PROXY')
+                
+                # Устанавливаем прокси для этого запроса
+                os.environ['HTTP_PROXY'] = self.proxy
+                os.environ['HTTPS_PROXY'] = self.proxy
             
-            client = openai.OpenAI(**client_kwargs)
+            # Создаем клиент OpenAI
+            # httpx (который использует openai) автоматически подхватит переменные окружения
+            client = openai.OpenAI(api_key=self.api_key)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             
             # Сохраняем промпт для отладки
             self._save_debug_prompt(prompt, timestamp)
             
-            response = client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "Ты эксперт по технической документации. Твоя задача - заполнить JSON шаблон данными из технического задания. Отвечай только валидным JSON без дополнительных комментариев."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ]
-            )
+            try:
+                response = client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "Ты эксперт по технической документации. Твоя задача - заполнить JSON шаблон данными из технического задания. Отвечай только валидным JSON без дополнительных комментариев."
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ]
+                )
+            finally:
+                # Восстанавливаем старые значения переменных окружения
+                if self.proxy:
+                    if old_http_proxy is not None:
+                        os.environ['HTTP_PROXY'] = old_http_proxy
+                    else:
+                        os.environ.pop('HTTP_PROXY', None)
+                    
+                    if old_https_proxy is not None:
+                        os.environ['HTTPS_PROXY'] = old_https_proxy
+                    else:
+                        os.environ.pop('HTTPS_PROXY', None)
             
             content = response.choices[0].message.content if response.choices else None
             
