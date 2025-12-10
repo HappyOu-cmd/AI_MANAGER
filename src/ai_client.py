@@ -554,6 +554,60 @@ class OpenAIClient:
             'usage': None,
             'error': 'Превышено количество попыток'
         }
+    
+    def process_prompt_text(self, prompt: str, max_retries: int = 2) -> Dict[str, Any]:
+        """
+        Обрабатывает промпт и возвращает текст (не JSON)
+        
+        Args:
+            prompt: Промпт для отправки
+            max_retries: Количество попыток при ошибке
+        
+        Returns:
+            Словарь с результатом:
+            {
+                'success': bool,
+                'text': str или None,
+                'raw_response': str,
+                'usage': dict,
+                'error': str или None
+            }
+        """
+        for attempt in range(max_retries + 1):
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            response = self._make_request(prompt, save_prompt=(attempt == 0), timestamp=timestamp)
+            
+            if not response['success']:
+                if attempt < max_retries and response.get('error_type') == 'rate_limit':
+                    wait_time = (attempt + 1) * 2
+                    time.sleep(wait_time)
+                    continue
+                return {
+                    'success': False,
+                    'text': None,
+                    'raw_response': None,
+                    'usage': None,
+                    'error': response.get('error', 'Неизвестная ошибка')
+                }
+            
+            # Возвращаем текст как есть
+            content = response['content']
+            
+            return {
+                'success': True,
+                'text': content,
+                'raw_response': content,
+                'usage': response.get('usage'),
+                'error': None
+            }
+        
+        return {
+            'success': False,
+            'text': None,
+            'raw_response': None,
+            'usage': None,
+            'error': 'Превышено количество попыток'
+        }
 
 
 class JayFlowClient:
@@ -1087,6 +1141,60 @@ class JayFlowClient:
         return {
             'success': False,
             'json': None,
+            'raw_response': None,
+            'usage': None,
+            'error': 'Превышено количество попыток'
+        }
+    
+    def process_prompt_text(self, prompt: str, max_retries: int = 2) -> Dict[str, Any]:
+        """
+        Обрабатывает промпт и возвращает текст (не JSON)
+        
+        Args:
+            prompt: Промпт для отправки
+            max_retries: Количество попыток при ошибке
+        
+        Returns:
+            Словарь с результатом:
+            {
+                'success': bool,
+                'text': str или None,
+                'raw_response': str,
+                'usage': dict,
+                'error': str или None
+            }
+        """
+        for attempt in range(max_retries + 1):
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            response = self._make_request(prompt, save_prompt=(attempt == 0), timestamp=timestamp)
+            
+            if not response['success']:
+                if attempt < max_retries:
+                    wait_time = (attempt + 1) * 2
+                    time.sleep(wait_time)
+                    continue
+                return {
+                    'success': False,
+                    'text': None,
+                    'raw_response': None,
+                    'usage': None,
+                    'error': response.get('error', 'Неизвестная ошибка')
+                }
+            
+            # Возвращаем текст как есть
+            content = response['content']
+            
+            return {
+                'success': True,
+                'text': content,
+                'raw_response': content,
+                'usage': None,  # Jay Flow не предоставляет информацию об использовании токенов
+                'error': None
+            }
+        
+        return {
+            'success': False,
+            'text': None,
             'raw_response': None,
             'usage': None,
             'error': 'Превышено количество попыток'

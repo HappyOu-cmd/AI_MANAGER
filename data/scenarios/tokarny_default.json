@@ -1,0 +1,38 @@
+{
+  "id": "tokarny_default",
+  "name": "Токарный станок (по умолчанию)",
+  "machine_type": "токарный",
+  "description": "Сценарий для обработки ТЗ токарных станков",
+  "created_at": "2024-01-15T10:00:00",
+  "updated_at": "2025-12-10T14:16:28.834226",
+  "prompts": {
+    "main": {
+      "enabled": true,
+      "file": "data/prompts/токарный/основной.txt",
+      "tz_template": "data/TZ.json",
+      "glossary": "data/glossary.json"
+    },
+    "instrument": {
+      "enabled": true,
+      "file": "data/prompts/токарный/инструмент.txt"
+    },
+    "tooling": {
+      "enabled": true,
+      "file": "data/prompts/токарный/оснастка.txt"
+    },
+    "services": {
+      "enabled": true,
+      "file": "data/prompts/токарный/услуги.txt"
+    },
+    "spare_parts": {
+      "enabled": true,
+      "file": "data/prompts/токарный/зип.txt"
+    }
+  },
+  "output": {
+    "main_format": "json",
+    "additional_formats": [
+      "word"
+    ]
+  }
+}

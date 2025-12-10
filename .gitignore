@@ -18,6 +18,7 @@ uploads/
 converted/
 results/
 debug/
+storage/
 
 # IDE
 .vscode/

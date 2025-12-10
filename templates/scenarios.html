@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Управление сценариями</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .scenarios-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .scenario-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .scenario-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .scenario-name {
+            font-size: 20px;
+            font-weight: bold;
+            color: #d32f2f;
+        }
+        .scenario-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-primary {
+            background: #d32f2f;
+            color: white;
+        }
+        .btn-secondary {
+            background: #666;
+            color: white;
+        }
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+        .prompt-config {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 4px;
+        }
+        .prompt-config label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .prompt-config input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+        }
+        .prompt-config select {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #d32f2f;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⚙️ Управление сценариями</h1>
+            <p class="subtitle">Создавайте и настраивайте сценарии обработки ТЗ</p>
+        </header>
+
+        <main>
+            <a href="/" class="back-link">← Назад к главной</a>
+            
+            <div class="scenarios-container">
+                <div style="margin-bottom: 20px;">
+                    <button class="btn btn-primary" onclick="showCreateForm()">+ Создать новый сценарий</button>
+                </div>
+
+                <div id="scenariosList">
+                    {% for scenario in scenarios %}
+                    <div class="scenario-card" data-scenario-id="{{ scenario.id }}">
+                        <div class="scenario-header">
+                            <div>
+                                <div class="scenario-name">{{ scenario.name }}</div>
+                                <div style="color: #666; margin-top: 5px;">
+                                    Тип станка: {{ scenario.machine_type }} | 
+                                    Создан: {{ scenario.created_at[:10] }}
+                                </div>
+                            </div>
+                            <div class="scenario-actions">
+                                <button class="btn btn-secondary" onclick="editScenario('{{ scenario.id }}')">Редактировать</button>
+                                <button class="btn btn-danger" onclick="deleteScenario('{{ scenario.id }}')">Удалить</button>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 15px;">
+                            <h4>Настройки промптов:</h4>
+                            
+                            <div class="prompt-config">
+                                <label>
+                                    <input type="checkbox" disabled {% if scenario.prompts.main.enabled %}checked{% endif %}>
+                                    <strong>Основной промпт:</strong>
+                                    <span>{{ scenario.prompts.main.file }}</span>
+                                </label>
+                            </div>
+                            
+                            {% for prompt_type, prompt_data in scenario.prompts.items() %}
+                            {% if prompt_type != 'main' %}
+                            <div class="prompt-config">
+                                <label>
+                                    <input type="checkbox" disabled {% if prompt_data.enabled %}checked{% endif %}>
+                                    <strong>{{ prompt_type }}:</strong>
+                                    <span>{{ prompt_data.file or 'Не выбран' }}</span>
+                                </label>
+                            </div>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Форма создания/редактирования -->
+                <div id="scenarioForm" style="display: none;" class="scenario-card">
+                    <h2 id="formTitle">Создать сценарий</h2>
+                    <form id="scenarioFormElement" onsubmit="saveScenario(event)">
+                        <input type="hidden" id="scenarioId" name="id">
+                        
+                        <div style="margin-bottom: 15px;">
+                            <label>Название сценария:</label>
+                            <input type="text" id="scenarioName" name="name" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                        
+                        <div style="margin-bottom: 15px;">
+                            <label>Тип станка:</label>
+                            <input type="text" id="machineType" name="machine_type" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="токарный, фрезерный и т.д.">
+                        </div>
+                        
+                        <div style="margin-bottom: 15px;">
+                            <label>Описание:</label>
+                            <textarea id="scenarioDescription" name="description" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; min-height: 60px;"></textarea>
+                        </div>
+                        
+                        <h3>Настройки промптов:</h3>
+                        
+                        <!-- Основной промпт -->
+                        <div class="prompt-config">
+                            <label>
+                                <input type="checkbox" id="mainEnabled" name="main_enabled" checked>
+                                <strong>Основной промпт (JSON + Excel):</strong>
+                            </label>
+                            <div style="margin-top: 10px; margin-left: 30px;">
+                                <label>Файл промпта:</label>
+                                <select id="mainPrompt" name="main_prompt" required>
+                                    {% for prompt in available_prompts.main %}
+                                    <option value="{{ prompt }}">{{ prompt }}</option>
+                                    {% endfor %}
+                                </select>
+                                
+                                <label style="margin-top: 10px; display: block;">TZ шаблон:</label>
+                                <select id="mainTZ" name="main_tz" required>
+                                    {% for template in available_templates %}
+                                    <option value="{{ template }}" {% if template == 'data/TZ.json' %}selected{% endif %}>{{ template }}</option>
+                                    {% endfor %}
+                                </select>
+                                
+                                <label style="margin-top: 10px; display: block;">Глоссарий:</label>
+                                <select id="mainGlossary" name="main_glossary" required>
+                                    {% for glossary in available_glossaries %}
+                                    <option value="{{ glossary }}" {% if glossary == 'data/glossary.json' %}selected{% endif %}>{{ glossary }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <!-- Дополнительные промпты -->
+                        {% for prompt_type, prompt_name in [('instrument', 'Инструмент'), ('tooling', 'Оснастка'), ('services', 'Услуги'), ('spare_parts', 'ЗИП')] %}
+                        <div class="prompt-config">
+                            <label>
+                                <input type="checkbox" id="{{ prompt_type }}Enabled" name="{{ prompt_type }}_enabled">
+                                <strong>{{ prompt_name }} (Word):</strong>
+                            </label>
+                            <div style="margin-top: 10px; margin-left: 30px;">
+                                <label>Файл промпта:</label>
+                                <select id="{{ prompt_type }}Prompt" name="{{ prompt_type }}_prompt">
+                                    <option value="">Не выбран</option>
+                                    {% for prompt in available_prompts[prompt_type] %}
+                                    <option value="{{ prompt }}">{{ prompt }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        
+                        <div style="margin-top: 20px;">
+                            <button type="submit" class="btn btn-primary">Сохранить</button>
+                            <button type="button" class="btn btn-secondary" onclick="hideForm()">Отмена</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let editingScenarioId = null;
+
+        function showCreateForm() {
+            editingScenarioId = null;
+            document.getElementById('formTitle').textContent = 'Создать сценарий';
+            document.getElementById('scenarioFormElement').reset();
+            document.getElementById('scenarioId').value = '';
+            document.getElementById('scenarioForm').style.display = 'block';
+            document.getElementById('scenariosList').style.display = 'none';
+        }
+
+        function hideForm() {
+            document.getElementById('scenarioForm').style.display = 'none';
+            document.getElementById('scenariosList').style.display = 'block';
+        }
+
+        async function editScenario(scenarioId) {
+            try {
+                const response = await fetch(`/api/scenarios/${scenarioId}`);
+                const scenario = await response.json();
+                
+                editingScenarioId = scenarioId;
+                document.getElementById('formTitle').textContent = 'Редактировать сценарий';
+                document.getElementById('scenarioId').value = scenario.id;
+                document.getElementById('scenarioName').value = scenario.name;
+                document.getElementById('machineType').value = scenario.machine_type;
+                document.getElementById('scenarioDescription').value = scenario.description || '';
+                
+                // Основной промпт
+                document.getElementById('mainEnabled').checked = scenario.prompts.main.enabled;
+                document.getElementById('mainPrompt').value = scenario.prompts.main.file;
+                document.getElementById('mainTZ').value = scenario.prompts.main.tz_template;
+                document.getElementById('mainGlossary').value = scenario.prompts.main.glossary;
+                
+                // Дополнительные промпты
+                ['instrument', 'tooling', 'services', 'spare_parts'].forEach(type => {
+                    document.getElementById(`${type}Enabled`).checked = scenario.prompts[type].enabled;
+                    document.getElementById(`${type}Prompt`).value = scenario.prompts[type].file || '';
+                });
+                
+                document.getElementById('scenarioForm').style.display = 'block';
+                document.getElementById('scenariosList').style.display = 'none';
+            } catch (error) {
+                alert('Ошибка загрузки сценария: ' + error.message);
+            }
+        }
+
+        async function deleteScenario(scenarioId) {
+            if (!confirm('Вы уверены, что хотите удалить этот сценарий?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/scenarios/${scenarioId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    const data = await response.json();
+                    alert('Ошибка удаления: ' + (data.error || 'Неизвестная ошибка'));
+                }
+            } catch (error) {
+                alert('Ошибка удаления: ' + error.message);
+            }
+        }
+
+        async function saveScenario(event) {
+            event.preventDefault();
+            
+            const formData = new FormData(event.target);
+            
+            // Формируем структуру сценария
+            const scenarioData = {
+                name: formData.get('name'),
+                machine_type: formData.get('machine_type'),
+                description: formData.get('description') || '',
+                prompts: {
+                    main: {
+                        enabled: formData.get('main_enabled') === 'on',
+                        file: formData.get('main_prompt'),
+                        tz_template: formData.get('main_tz'),
+                        glossary: formData.get('main_glossary')
+                    },
+                    instrument: {
+                        enabled: formData.get('instrument_enabled') === 'on',
+                        file: formData.get('instrument_prompt') || null
+                    },
+                    tooling: {
+                        enabled: formData.get('tooling_enabled') === 'on',
+                        file: formData.get('tooling_prompt') || null
+                    },
+                    services: {
+                        enabled: formData.get('services_enabled') === 'on',
+                        file: formData.get('services_prompt') || null
+                    },
+                    spare_parts: {
+                        enabled: formData.get('spare_parts_enabled') === 'on',
+                        file: formData.get('spare_parts_prompt') || null
+                    }
+                }
+            };
+            
+            // Если редактируем, добавляем ID
+            if (editingScenarioId) {
+                scenarioData.id = editingScenarioId;
+            }
+            
+            try {
+                const url = editingScenarioId 
+                    ? `/api/scenarios/${editingScenarioId}`
+                    : '/api/scenarios';
+                const method = editingScenarioId ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(scenarioData)
+                });
+                
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    const data = await response.json();
+                    alert('Ошибка сохранения: ' + (data.error || 'Неизвестная ошибка'));
+                }
+            } catch (error) {
+                alert('Ошибка сохранения: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>
+

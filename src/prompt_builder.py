@@ -14,9 +14,23 @@ class PromptBuilder:
     def __init__(self, prompt_file: str = "Промпт.txt", tz_template_file: str = "TZ.json", glossary_file: str = "glossary.json"):
         # Определяем корень проекта (на уровень выше src/)
         project_root = Path(__file__).parent.parent
-        self.prompt_file = project_root / prompt_file
-        self.tz_template_file = project_root / tz_template_file
-        self.glossary_file = project_root / glossary_file
+        
+        # Если путь абсолютный, используем его как есть, иначе относительный от корня проекта
+        if Path(prompt_file).is_absolute():
+            self.prompt_file = Path(prompt_file)
+        else:
+            self.prompt_file = project_root / prompt_file
+        
+        if Path(tz_template_file).is_absolute():
+            self.tz_template_file = Path(tz_template_file)
+        else:
+            self.tz_template_file = project_root / tz_template_file
+        
+        if Path(glossary_file).is_absolute():
+            self.glossary_file = Path(glossary_file)
+        else:
+            self.glossary_file = project_root / glossary_file
+        
         self.prompt_template = None
         
     def load_prompt_template(self) -> str:
@@ -140,9 +154,12 @@ class PromptBuilder:
         if glossary is None:
             glossary = self.load_glossary()
         
+        # Оптимизируем глоссарий: оставляем только параметры с match != null
+        optimized_glossary = self._filter_glossary(glossary)
+        
         # Форматируем JSON для вставки в промпт
         tz_json_str = json.dumps(tz_json, ensure_ascii=False, indent=2)
-        glossary_json_str = json.dumps(glossary, ensure_ascii=False, indent=2)
+        glossary_json_str = json.dumps(optimized_glossary, ensure_ascii=False, indent=2)
         
         # Заменяем плейсхолдеры в промпте
         prompt = self.prompt_template
@@ -205,6 +222,41 @@ class PromptBuilder:
         )
         
         return prompt
+    
+    def _filter_glossary(self, glossary: dict) -> dict:
+        """
+        Фильтрует глоссарий, оставляя только параметры с match != null
+        
+        Args:
+            glossary: Полный глоссарий
+        
+        Returns:
+            Оптимизированный глоссарий (только параметры с match)
+        """
+        if not isinstance(glossary, dict):
+            return {}
+        
+        filtered = {}
+        
+        for key, value in glossary.items():
+            if not isinstance(value, dict):
+                continue
+            
+            # Проверяем, является ли это параметром (имеет поля match/unit)
+            if 'match' in value or 'unit' in value:
+                # Это параметр - проверяем match
+                match_value = value.get('match')
+                # Оставляем только если match не null и не пустой список
+                if match_value is not None and match_value != []:
+                    filtered[key] = value
+            else:
+                # Это секция - рекурсивно фильтруем
+                filtered_section = self._filter_glossary(value)
+                # Добавляем секцию только если в ней есть параметры
+                if filtered_section:
+                    filtered[key] = filtered_section
+        
+        return filtered
     
     def save_prompt(self, prompt: str, output_file: str = "prompt_final.txt"):
         """Сохраняет финальный промпт в файл (для отладки)"""

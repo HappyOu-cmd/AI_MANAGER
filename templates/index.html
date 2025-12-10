@@ -3,113 +3,221 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Конвертер документов в текст</title>
+    <title>ИИ Менеджер для заполнения ТЗ</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🤖 ИИ Менеджер для заполнения ТЗ</h1>
-            <p class="subtitle">Загрузите документ → ИИ заполнит техническое задание</p>
-        </header>
+    <!-- Кнопка меню для мобильных -->
+    <button class="menu-toggle" id="menuToggle" style="display: none;">☰</button>
+    
+    <!-- Боковая панель -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                <div class="sidebar-logo-icon">🤖</div>
+                <div class="sidebar-logo-text">ИИ Менеджер</div>
+            </div>
+            <div class="sidebar-subtitle">Заполнение ТЗ</div>
+        </div>
+        
+        <nav class="sidebar-nav">
+            <a href="/" class="sidebar-nav-item active">
+                <span class="sidebar-nav-item-icon">📄</span>
+                <span>Обработка документов</span>
+            </a>
+            <a href="/scenarios" class="sidebar-nav-item">
+                <span class="sidebar-nav-item-icon">⚙️</span>
+                <span>Сценарии</span>
+            </a>
+        </nav>
+        
+        <div class="sidebar-footer">
+            <div class="sidebar-footer-text">ИИ Менеджер v1.0</div>
+        </div>
+    </aside>
 
-        <main>
-            <div class="upload-section">
-                <div class="upload-box" id="uploadBox">
-                    <div class="upload-icon">📤</div>
-                    <h2>Загрузите ТЗ заказчика</h2>
-                    <p class="formats">Поддерживаемые форматы: PDF, DOC, DOCX, XLS, XLSX, TXT</p>
-                    <p class="process-info">Процесс: Конвертация → Обработка ИИ → Заполненный JSON</p>
-                    
-                    <form id="uploadForm" enctype="multipart/form-data">
-                        <input type="file" id="fileInput" name="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt" required>
-                        <label for="fileInput" class="file-label">
-                            <span class="file-button">Выбрать файл</span>
-                            <span class="file-name" id="fileName">Файл не выбран</span>
-                        </label>
-                        
-                        <div class="ai-selector" style="margin: 20px 0;">
-                            <label for="aiProvider" style="display: block; margin-bottom: 10px; font-weight: bold; color: #333;">
-                                🤖 Выберите AI провайдера:
-                            </label>
-                            <select id="aiProvider" name="ai_provider" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; background: white; cursor: pointer;">
-                                <option value="openai">OpenAI (GPT-5)</option>
-                                <option value="jayflow">Jay Flow</option>
-                            </select>
-                        </div>
-                        
-                        <button type="submit" class="submit-btn" id="submitBtn">
-                            <span class="btn-text">Обработать с помощью ИИ</span>
-                            <span class="btn-loader" id="loader" style="display: none;">⏳</span>
-                        </button>
-                        
-                        <div class="progress-steps" id="progressSteps" style="display: none;">
-                            <div class="step" id="step1">
-                                <span class="step-icon">📄</span>
-                                <span class="step-text">Конвертация документа...</span>
-                            </div>
-                            <div class="step" id="step2">
-                                <span class="step-icon">🔧</span>
-                                <span class="step-text">Построение промпта...</span>
-                            </div>
-                            <div class="step" id="step3">
-                                <span class="step-icon">🤖</span>
-                                <span class="step-text">Обработка ИИ...</span>
-                            </div>
-                        </div>
-                    </form>
+    <!-- Основной контент -->
+    <main class="main-content">
+        <div class="container">
+            <!-- Заголовок страницы -->
+            <div class="page-header">
+                <h1>Обработка технического задания</h1>
+                <p class="subtitle">Загрузите документ и получите заполненное ТЗ с помощью ИИ</p>
+            </div>
+
+            <!-- Карточка загрузки -->
+            <div class="card upload-card">
+                <div class="card-header">
+                    <div class="card-icon">📤</div>
+                    <div class="card-title">Загрузка документа</div>
                 </div>
 
-                <div class="result-section" id="resultSection" style="display: none;">
-                    <div class="result-box success" id="resultBox">
-                        <div class="result-icon">✅</div>
-                        <h3>ТЗ успешно заполнено!</h3>
-                        <p id="resultMessage"></p>
-                        <div class="file-info" id="fileInfo"></div>
-                        <div class="usage-info" id="usageInfo" style="display: none;"></div>
-                        <div class="download-buttons" id="downloadButtons" style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; margin-top: 20px;">
-                            <a href="#" id="downloadJsonLink" class="download-btn" download>
-                                📥 Скачать JSON
-                            </a>
-                            <a href="#" id="downloadExcelLink" class="download-btn" download style="display: none;">
-                                📊 Скачать Excel
-                            </a>
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <!-- Область загрузки -->
+                    <div class="upload-area" id="uploadArea">
+                        <div class="upload-icon-large">📄</div>
+                        <div class="upload-text">Перетащите файл сюда или нажмите для выбора</div>
+                        <div class="upload-formats">Поддерживаемые форматы: PDF, DOC, DOCX, XLS, XLSX, TXT</div>
+                        <input type="file" id="fileInput" name="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt" required style="display: none;">
+                        <button type="button" class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                            Выбрать файл
+                        </button>
+                        <div id="fileName" style="margin-top: 12px; font-size: 14px; color: var(--text-light);">Файл не выбран</div>
+                    </div>
+
+                    <!-- Выбор сценария -->
+                    <div class="form-group">
+                        <label class="form-label" for="scenarioSelect">
+                            <span>📋</span>
+                            <span>Сценарий обработки</span>
+                        </label>
+                        <select id="scenarioSelect" name="scenario_id" class="form-select" required>
+                            {% for scenario in scenarios %}
+                            <option value="{{ scenario.id }}" {% if scenario.id == 'tokarny_default' %}selected{% endif %}>
+                                {{ scenario.name }} ({{ scenario.machine_type }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <a href="/scenarios" class="form-link">
+                            <span>⚙️</span>
+                            <span>Управление сценариями</span>
+                        </a>
+                    </div>
+
+                    <!-- Выбор AI провайдера -->
+                    <div class="form-group">
+                        <label class="form-label" for="aiProvider">
+                            <span>🤖</span>
+                            <span>AI провайдер</span>
+                        </label>
+                        <select id="aiProvider" name="ai_provider" class="form-select">
+                            <option value="openai">OpenAI (GPT-5)</option>
+                            <option value="jayflow">Jay Flow</option>
+                        </select>
+                    </div>
+
+                    <!-- Кнопка отправки -->
+                    <button type="submit" class="btn btn-primary" id="submitBtn" style="width: 100%; margin-top: 8px;">
+                        <span class="btn-text">Обработать с помощью ИИ</span>
+                        <span class="loader" id="loader" style="display: none;">⏳</span>
+                    </button>
+
+                    <!-- Прогресс -->
+                    <div class="progress-container" id="progressSteps" style="display: none;">
+                        <div class="progress-bar-wrapper">
+                            <div class="progress-bar" id="progressBar"></div>
                         </div>
+                        <div class="progress-text" id="statusMessage">Инициализация...</div>
+                        
+                        <div class="progress-steps">
+                            <div class="step" id="step_conversion">
+                                <div class="step-icon">📄</div>
+                                <div class="step-text">Конвертация документа...</div>
+                            </div>
+                            <div class="step" id="step_main">
+                                <div class="step-icon">🤖</div>
+                                <div class="step-text">Обработка основного промпта...</div>
+                            </div>
+                            <div class="step" id="step_instrument" style="display: none;">
+                                <div class="step-icon">🔧</div>
+                                <div class="step-text">Извлечение инструмента...</div>
+                            </div>
+                            <div class="step" id="step_tooling" style="display: none;">
+                                <div class="step-icon">⚙️</div>
+                                <div class="step-text">Извлечение оснастки...</div>
+                            </div>
+                            <div class="step" id="step_services" style="display: none;">
+                                <div class="step-icon">💼</div>
+                                <div class="step-text">Извлечение услуг...</div>
+                            </div>
+                            <div class="step" id="step_spare_parts" style="display: none;">
+                                <div class="step-icon">📦</div>
+                                <div class="step-text">Извлечение ЗИП...</div>
+                            </div>
+                        </div>
+                        
+                        <div class="metrics-card" id="metricsBox" style="display: none;">
+                            <div class="metrics-title">
+                                <span>📊</span>
+                                <span>Метрики обработки</span>
+                            </div>
+                            <div id="metricsContainer"></div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Результаты -->
+            <div class="card result-card" id="resultSection" style="display: none;">
+                <div class="result-icon-large">✅</div>
+                <div class="result-title">ТЗ успешно заполнено!</div>
+                <p id="resultMessage" style="color: var(--text-light); margin-bottom: 24px;"></p>
+                
+                <div class="file-info-card" id="fileInfo"></div>
+                
+                <div class="download-buttons" id="downloadButtons">
+                    <!-- Кнопки будут добавлены динамически -->
+                </div>
+            </div>
+
+            <!-- Ошибки -->
+            <div class="card error-card" id="errorBox" style="display: none;">
+                <div class="error-icon-large">❌</div>
+                <div class="error-title">Ошибка обработки</div>
+                <p id="errorMessage" style="color: var(--text-light);"></p>
+            </div>
+
+            <!-- Информационная карточка -->
+            <div class="card info-card">
+                <div class="card-header">
+                    <div class="card-icon">ℹ️</div>
+                    <div class="card-title">Как это работает</div>
+                </div>
+                
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-item-title">1. Загрузка документа</div>
+                        <div class="info-item-text">Загрузите ТЗ заказчика в формате PDF, Word или Excel</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-item-title">2. Автоматическая конвертация</div>
+                        <div class="info-item-text">Документ автоматически преобразуется в текст для анализа</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-item-title">3. Обработка ИИ</div>
+                        <div class="info-item-text">Искусственный интеллект анализирует текст и заполняет шаблон</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-item-title">4. Скачивание результата</div>
+                        <div class="info-item-text">Получите заполненный JSON и Excel файлы с результатами</div>
                     </div>
                 </div>
 
-                <div class="error-box" id="errorBox" style="display: none;">
-                    <div class="error-icon">❌</div>
-                    <h3>Ошибка</h3>
-                    <p id="errorMessage"></p>
+                <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--gray-200);">
+                    <div class="info-item-title" style="margin-bottom: 12px;">Поддерживаемые форматы</div>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <div class="info-item-title">PDF</div>
+                            <div class="info-item-text">Извлекается весь текст из документа</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-item-title">Word (DOCX/DOC)</div>
+                            <div class="info-item-text">Текст и таблицы с сохранением структуры</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-item-title">Excel (XLS/XLSX)</div>
+                            <div class="info-item-text">Все листы с сохранением данных</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-item-title">Максимальный размер</div>
+                            <div class="info-item-text">До 50 МБ на файл</div>
+                        </div>
+                    </div>
                 </div>
             </div>
-
-            <div class="info-section">
-                <h3>ℹ️ Как это работает</h3>
-                <ol>
-                    <li><strong>Загрузите документ</strong> с ТЗ заказчика (PDF, Word, Excel)</li>
-                    <li><strong>Автоматическая конвертация</strong> документа в текст</li>
-                    <li><strong>ИИ анализирует</strong> текст и заполняет шаблон JSON</li>
-                    <li><strong>Скачайте результат</strong> - заполненный JSON файл</li>
-                </ol>
-                <h3 style="margin-top: 20px;">📋 Поддерживаемые форматы</h3>
-                <ul>
-                    <li><strong>PDF</strong> - извлекается весь текст</li>
-                    <li><strong>Word (DOCX)</strong> - текст и таблицы</li>
-                    <li><strong>Word (DOC)</strong> - требуется antiword</li>
-                    <li><strong>Excel</strong> - все листы с сохранением структуры</li>
-                    <li><strong>Максимальный размер:</strong> 50 МБ</li>
-                </ul>
-            </div>
-        </main>
-
-        <footer>
-            <p>ИИ Менеджер для выбора станков</p>
-        </footer>
-    </div>
+        </div>
+    </main>
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
-
