@@ -28,7 +28,7 @@ remote_exec "cd $PROJECT_DIR && git pull origin main"
 
 echo ""
 echo "📋 Шаг 3: Установка новых зависимостей..."
-remote_exec "cd $PROJECT_DIR && source venv/bin/activate && pip install -q httpx || pip install httpx"
+remote_exec "cd $PROJECT_DIR && source venv/bin/activate && pip install -q --upgrade pip && pip install -q -r requirements.txt"
 
 echo ""
 echo "✅ Шаг 4: Проверка изменений..."
