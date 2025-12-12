@@ -49,10 +49,11 @@ def create_app(config_class=Config):
     _setup_logging(app)
     
     # Регистрируем blueprints
-    from app.routes import main, upload, download
+    from app.routes import main, upload, download, scenarios
     app.register_blueprint(main.bp)
     app.register_blueprint(upload.bp)
     app.register_blueprint(download.bp)
+    app.register_blueprint(scenarios.bp)
     
     # Регистрируем обработчики ошибок
     from app.utils.error_handlers import register_error_handlers
