@@ -8,6 +8,7 @@ from werkzeug.utils import secure_filename
 from pathlib import Path
 import sys
 import uuid
+import re
 
 # Добавляем путь к src для импорта старых модулей
 project_root = Path(__file__).parent.parent.parent
@@ -42,8 +43,10 @@ def upload_file():
         current_app.logger.warning("❌ Имя файла пустое")
         return jsonify({'error': 'Файл не выбран'}), 400
     
-    if not allowed_file(file.filename):
-        current_app.logger.warning(f"❌ Неподдерживаемый формат: {file.filename}")
+    # Проверяем расширение ДО применения secure_filename (который может удалить кириллицу)
+    original_filename = file.filename
+    if not allowed_file(original_filename):
+        current_app.logger.warning(f"❌ Неподдерживаемый формат: {original_filename}")
         return jsonify({
             'error': f'Неподдерживаемый формат. Разрешены: {", ".join(ALLOWED_EXTENSIONS)}'
         }), 400
@@ -66,9 +69,19 @@ def upload_file():
             # Используем task_id для уникальности имен файлов при параллельной обработке
             current_app.logger.info("📁 Шаг 1: Сохранение файла...")
             status_manager.update_status(task_id, stage='file_upload', message='Сохранение файла...')
-            original_filename = secure_filename(file.filename)
+            # Применяем secure_filename для безопасного имени, но сохраняем оригинальное для отображения
+            safe_filename = secure_filename(original_filename)
+            # Если secure_filename удалил все (кириллица), используем оригинальное имя с заменой небезопасных символов
+            if not safe_filename or safe_filename == original_filename.rsplit('.', 1)[-1]:
+                # Создаем безопасное имя вручную: заменяем пробелы и небезопасные символы
+                name_part = original_filename.rsplit('.', 1)[0] if '.' in original_filename else original_filename
+                ext_part = original_filename.rsplit('.', 1)[-1] if '.' in original_filename else ''
+                # Заменяем небезопасные символы на подчеркивания, но сохраняем кириллицу
+                safe_name = re.sub(r'[^\w\s\-_\.]', '_', name_part)
+                safe_name = re.sub(r'\s+', '_', safe_name)
+                safe_filename = f"{safe_name}.{ext_part}" if ext_part else safe_name
             # Добавляем task_id для уникальности при параллельной обработке
-            filename = f"{task_id}_{original_filename}"
+            filename = f"{task_id}_{safe_filename}"
             upload_path = Path(current_app.config['UPLOAD_FOLDER']) / filename
             file.save(str(upload_path))
             current_app.logger.info(f"✅ Файл сохранен: {upload_path}")
@@ -78,7 +91,8 @@ def upload_file():
             status_manager.update_status(task_id, stage='conversion', message='Конвертация документа в текст...')
             converter = DocumentConverter()
             # Используем task_id для уникальности имен конвертированных файлов
-            converted_filename = f"{task_id}_{Path(original_filename).stem}_converted.txt"
+            # Используем safe_filename для имени конвертированного файла
+            converted_filename = f"{task_id}_{Path(safe_filename).stem}_converted.txt"
             converted_path = converter.convert(
                 str(upload_path),
                 str(Path(current_app.config['OUTPUT_FOLDER']) / converted_filename)
@@ -113,7 +127,7 @@ def upload_file():
             
             executor = ScenarioExecutor(scenario, status_manager=status_manager, task_id=task_id)
             # Используем task_id в output_prefix для уникальности при параллельной обработке
-            output_prefix = f"{task_id}_{Path(original_filename).stem}"
+            output_prefix = f"{task_id}_{Path(safe_filename).stem}"
             result = executor.execute(
                 converted_text,
                 ai_provider=ai_provider,
