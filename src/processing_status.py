@@ -74,13 +74,14 @@ class ProcessingStatus:
                 print(f"⚠️  Ошибка обновления статуса: {e}")
     
     def get_status(self, task_id: str) -> Optional[Dict]:
-        """Получает текущий статус обработки"""
+        """Получает текущий статус обработки (thread-safe чтение)"""
         status_file = self.status_dir / f"{task_id}.json"
         
         if not status_file.exists():
             return None
         
         try:
+            # Чтение не требует блокировки, так как каждый task_id уникален
             with open(status_file, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception as e:

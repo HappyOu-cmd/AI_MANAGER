@@ -63,9 +63,12 @@ def upload_file():
         
         try:
             # Шаг 1: Сохраняем загруженный файл
+            # Используем task_id для уникальности имен файлов при параллельной обработке
             current_app.logger.info("📁 Шаг 1: Сохранение файла...")
             status_manager.update_status(task_id, stage='file_upload', message='Сохранение файла...')
-            filename = secure_filename(file.filename)
+            original_filename = secure_filename(file.filename)
+            # Добавляем task_id для уникальности при параллельной обработке
+            filename = f"{task_id}_{original_filename}"
             upload_path = Path(current_app.config['UPLOAD_FOLDER']) / filename
             file.save(str(upload_path))
             current_app.logger.info(f"✅ Файл сохранен: {upload_path}")
@@ -74,7 +77,8 @@ def upload_file():
             current_app.logger.info("🔄 Шаг 2: Конвертация документа...")
             status_manager.update_status(task_id, stage='conversion', message='Конвертация документа в текст...')
             converter = DocumentConverter()
-            converted_filename = f"{Path(filename).stem}_converted.txt"
+            # Используем task_id для уникальности имен конвертированных файлов
+            converted_filename = f"{task_id}_{Path(original_filename).stem}_converted.txt"
             converted_path = converter.convert(
                 str(upload_path),
                 str(Path(current_app.config['OUTPUT_FOLDER']) / converted_filename)
@@ -108,10 +112,12 @@ def upload_file():
             ai_provider = request.form.get('ai_provider', 'openai').lower()
             
             executor = ScenarioExecutor(scenario, status_manager=status_manager, task_id=task_id)
+            # Используем task_id в output_prefix для уникальности при параллельной обработке
+            output_prefix = f"{task_id}_{Path(original_filename).stem}"
             result = executor.execute(
                 converted_text,
                 ai_provider=ai_provider,
-                output_prefix=Path(filename).stem
+                output_prefix=output_prefix
             )
             
             if not result['success']:
