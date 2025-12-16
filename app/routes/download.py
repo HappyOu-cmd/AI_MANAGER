@@ -34,16 +34,44 @@ def download_file(filename):
 @login_required
 def download_result(filename):
     """Скачивание заполненного JSON или Excel файла (только для владельца)"""
-    safe_filename = secure_filename(filename)
-    file_path = Path(current_app.config['RESULTS_FOLDER']) / safe_filename
+    # Проверяем права доступа - находим документ по имени файла (используем оригинальное имя)
+    doc = Document.query.filter(
+        (Document.json_file == filename) | (Document.excel_file == filename)
+    ).first()
+    
+    if not doc:
+        # Если не найдено по оригинальному имени, пробуем secure_filename
+        safe_filename = secure_filename(filename)
+        doc = Document.query.filter(
+            (Document.json_file == safe_filename) | (Document.excel_file == safe_filename)
+        ).first()
+    
+    if not doc:
+        # Если документ не найден в БД, проверяем, может это старый файл
+        # Для безопасности запрещаем доступ, если нет записи в БД
+        current_app.logger.warning(f"⚠️ Попытка скачать файл без записи в БД: {filename} пользователем {current_user.username}")
+        abort(403)
+    
+    # Проверяем, что файл принадлежит текущему пользователю
+    if doc.user_id != current_user.id:
+        current_app.logger.warning(f"⚠️ Попытка несанкционированного доступа: пользователь {current_user.username} пытается скачать файл пользователя {doc.user_id}")
+        abort(403)
+    
+    # Определяем имя файла для поиска на диске
+    # Используем имя из БД (может быть оригинальное или безопасное)
+    file_to_download = doc.json_file if filename == doc.json_file or filename == doc.excel_file else (doc.excel_file if filename == doc.excel_file else filename)
+    
+    # Пробуем найти файл по оригинальному имени из БД
+    file_path = Path(current_app.config['RESULTS_FOLDER']) / file_to_download
+    
+    # Если не найден, пробуем secure_filename
+    if not file_path.exists():
+        safe_filename = secure_filename(file_to_download)
+        file_path = Path(current_app.config['RESULTS_FOLDER']) / safe_filename
     
     if not file_path.exists():
+        current_app.logger.error(f"❌ Файл не найден на диске: {file_to_download} (проверено: {file_path})")
         return jsonify({'error': 'Файл не найден'}), 404
-    
-    # Проверяем права доступа - находим документ по имени файла
-    doc = Document.query.filter(
-        (Document.json_file == safe_filename) | (Document.excel_file == safe_filename)
-    ).first()
     
     if not doc:
         # Если документ не найден в БД, проверяем, может это старый файл
