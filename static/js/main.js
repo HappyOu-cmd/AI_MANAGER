@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Глобальная переменная для интервала polling
     let statusPollInterval = null;
+    let currentTaskId = null; // Текущий task_id
     
     // Управление боковой панелью на мобильных
     const menuToggle = document.getElementById('menuToggle');
@@ -97,6 +98,81 @@ document.addEventListener('DOMContentLoaded', function() {
     fileInput.addEventListener('change', function(e) {
         updateFileName(e.target.files[0]);
     });
+    
+    // Восстановление прогресса при загрузке страницы
+    function restoreProgress() {
+        const savedTaskId = localStorage.getItem('currentTaskId');
+        if (savedTaskId) {
+            console.log('🔄 Восстановление прогресса для task_id:', savedTaskId);
+            currentTaskId = savedTaskId;
+            
+            // Показываем UI обработки
+            submitBtn.disabled = true;
+            loader.style.display = 'inline';
+            document.querySelector('.btn-text').textContent = 'Обработка...';
+            progressSteps.style.display = 'block';
+            
+            // Показываем кнопку остановки
+            const cancelBtn = document.getElementById('cancelBtn');
+            if (cancelBtn) {
+                cancelBtn.style.display = 'inline-block';
+            }
+            
+            // Запускаем polling для восстановления статуса
+            startStatusPolling(savedTaskId);
+        }
+    }
+    
+    // Вызываем восстановление при загрузке
+    restoreProgress();
+    
+    // Обработчик кнопки остановки
+    const cancelBtn = document.getElementById('cancelBtn');
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', async function() {
+            if (!currentTaskId) {
+                console.warn('⚠️ Нет активной задачи для остановки');
+                return;
+            }
+            
+            if (!confirm('Вы уверены, что хотите остановить обработку?')) {
+                return;
+            }
+            
+            try {
+                console.log('🛑 Отправка запроса на остановку для task_id:', currentTaskId);
+                const response = await fetch(`/api/status/${currentTaskId}/cancel`, {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('✅ Обработка остановлена:', result);
+                    showError('Обработка остановлена пользователем');
+                    
+                    // Очищаем сохраненный task_id
+                    localStorage.removeItem('currentTaskId');
+                    localStorage.removeItem('taskStartTime');
+                    currentTaskId = null;
+                    
+                    // Скрываем кнопку остановки
+                    cancelBtn.style.display = 'none';
+                    
+                    // Останавливаем polling
+                    if (statusPollInterval) {
+                        clearInterval(statusPollInterval);
+                        statusPollInterval = null;
+                    }
+                } else {
+                    console.error('❌ Ошибка остановки обработки:', response.status);
+                    alert('Не удалось остановить обработку. Попробуйте обновить страницу.');
+                }
+            } catch (error) {
+                console.error('❌ Ошибка при остановке обработки:', error);
+                alert('Ошибка при остановке обработки: ' + error.message);
+            }
+        });
+    }
 
     // Обработка отправки формы
     uploadForm.addEventListener('submit', async function(e) {
@@ -129,6 +205,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Генерируем task_id на клиенте для немедленного запуска polling
         const taskId = 'task_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        currentTaskId = taskId;
+        
+        // Сохраняем task_id в localStorage
+        localStorage.setItem('currentTaskId', taskId);
+        localStorage.setItem('taskStartTime', Date.now().toString());
+        
         // Очищаем предыдущий интервал если есть
         if (statusPollInterval) {
             clearInterval(statusPollInterval);
@@ -269,6 +351,12 @@ document.addEventListener('DOMContentLoaded', function() {
             progressSteps.style.display = 'block';
         }
         
+        // Показываем кнопку остановки
+        const cancelBtn = document.getElementById('cancelBtn');
+        if (cancelBtn) {
+            cancelBtn.style.display = 'inline-block';
+        }
+        
         // Функция для обновления статуса
         const updateStatus = async () => {
             try {
@@ -279,11 +367,22 @@ document.addEventListener('DOMContentLoaded', function() {
                     updateProgressFromStatus(status);
                     
                     // Если обработка завершена или ошибка, останавливаем polling
-                    if (status.status === 'completed' || status.status === 'error') {
+                    if (status.status === 'completed' || status.status === 'error' || status.status === 'cancelled') {
                         console.log('✅ Обработка завершена, останавливаем polling');
                         if (statusPollInterval) {
                             clearInterval(statusPollInterval);
                             statusPollInterval = null;
+                        }
+                        
+                        // Очищаем сохраненный task_id
+                        localStorage.removeItem('currentTaskId');
+                        localStorage.removeItem('taskStartTime');
+                        currentTaskId = null;
+                        
+                        // Скрываем кнопку остановки
+                        const cancelBtn = document.getElementById('cancelBtn');
+                        if (cancelBtn) {
+                            cancelBtn.style.display = 'none';
                         }
                         
                         // Восстанавливаем кнопку
@@ -296,6 +395,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         if (status.status === 'error') {
                             showError(status.message || 'Произошла ошибка при обработке');
+                        } else if (status.status === 'cancelled') {
+                            showError('Обработка отменена пользователем');
                         }
                     }
                 } else if (response.status === 404) {

@@ -105,4 +105,36 @@ class ProcessingStatus:
                 status['errors'] = []
             status['errors'].append(error)
             self.update_status(task_id, errors=status['errors'])
+    
+    def cancel_task(self, task_id: str) -> bool:
+        """Отменяет задачу (устанавливает флаг cancelled)"""
+        with self._lock:
+            status_file = self.status_dir / f"{task_id}.json"
+            
+            if not status_file.exists():
+                return False
+            
+            try:
+                with open(status_file, 'r', encoding='utf-8') as f:
+                    status = json.load(f)
+                
+                # Устанавливаем статус cancelled
+                status['status'] = 'cancelled'
+                status['message'] = 'Обработка отменена пользователем'
+                
+                # Сохраняем
+                with open(status_file, 'w', encoding='utf-8') as f:
+                    json.dump(status, f, ensure_ascii=False, indent=2)
+                
+                return True
+            except Exception as e:
+                print(f"⚠️  Ошибка отмены задачи: {e}")
+                return False
+    
+    def is_cancelled(self, task_id: str) -> bool:
+        """Проверяет, отменена ли задача"""
+        status = self.get_status(task_id)
+        if status:
+            return status.get('status') == 'cancelled'
+        return False
 

@@ -125,6 +125,7 @@ def upload_file():
             # Получаем выбор AI из запроса
             ai_provider = request.form.get('ai_provider', 'openai').lower()
             
+            current_app.logger.info(f"[{task_id}] 🚀 Начало выполнения сценария '{scenario_id}' (AI: {ai_provider})")
             executor = ScenarioExecutor(scenario, status_manager=status_manager, task_id=task_id)
             # Используем task_id в output_prefix для уникальности при параллельной обработке
             output_prefix = f"{task_id}_{Path(safe_filename).stem}"
@@ -133,6 +134,7 @@ def upload_file():
                 ai_provider=ai_provider,
                 output_prefix=output_prefix
             )
+            current_app.logger.info(f"[{task_id}] ✅ Сценарий выполнен (success: {result['success']}, ошибок: {len(result['errors'])})")
             
             if not result['success']:
                 status_manager.update_status(
@@ -246,3 +248,27 @@ def api_get_status(task_id):
         return jsonify({'error': 'Задача не найдена'}), 404
     
     return jsonify(status)
+
+
+@bp.route('/api/status/<task_id>/cancel', methods=['POST'])
+def api_cancel_task(task_id):
+    """API: Остановить обработку задачи"""
+    current_app.logger.info(f"🛑 Запрос на остановку задачи: {task_id}")
+    
+    status_manager = ProcessingStatus()
+    success = status_manager.cancel_task(task_id)
+    
+    if success:
+        current_app.logger.info(f"✅ Задача {task_id} успешно отменена")
+        return jsonify({
+            'success': True,
+            'message': 'Задача успешно отменена',
+            'task_id': task_id
+        })
+    else:
+        current_app.logger.warning(f"⚠️ Не удалось отменить задачу: {task_id}")
+        return jsonify({
+            'success': False,
+            'error': 'Задача не найдена или уже завершена',
+            'task_id': task_id
+        }), 404

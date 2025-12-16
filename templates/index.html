@@ -97,10 +97,15 @@
                     </div>
 
                     <!-- Кнопка отправки -->
-                    <button type="submit" class="btn btn-primary" id="submitBtn" style="width: 100%; margin-top: 8px;">
-                        <span class="btn-text">Обработать с помощью ИИ</span>
-                        <span class="loader" id="loader" style="display: none;">⏳</span>
-                    </button>
+                    <div style="display: flex; gap: 8px; margin-top: 8px;">
+                        <button type="submit" class="btn btn-primary" id="submitBtn" style="flex: 1;">
+                            <span class="btn-text">Обработать с помощью ИИ</span>
+                            <span class="loader" id="loader" style="display: none;">⏳</span>
+                        </button>
+                        <button type="button" class="btn btn-danger" id="cancelBtn" style="display: none;" title="Остановить обработку">
+                            ⏹️ Остановить
+                        </button>
+                    </div>
 
                     <!-- Прогресс -->
                     <div class="progress-container" id="progressSteps" style="display: none;">

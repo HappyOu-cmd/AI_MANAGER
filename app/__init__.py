@@ -97,19 +97,29 @@ def _create_directories(app):
 
 def _setup_logging(app):
     """Настраивает систему логирования"""
-    if not app.debug:
-        # Логирование в файл для продакшена
-        log_file = Path(app.config['LOG_FOLDER']) / 'app.log'
-        file_handler = RotatingFileHandler(
-            log_file,
-            maxBytes=10240000,  # 10MB
-            backupCount=10
-        )
-        file_handler.setFormatter(logging.Formatter(
-            '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+    # Всегда логируем в файл (и в debug, и в production)
+    log_file = Path(app.config['LOG_FOLDER']) / 'app.log'
+    file_handler = RotatingFileHandler(
+        log_file,
+        maxBytes=10240000,  # 10MB
+        backupCount=10
+    )
+    file_handler.setFormatter(logging.Formatter(
+            '%(asctime)s [%(levelname)s] [%(name)s] %(message)s [in %(pathname)s:%(lineno)d]'
         ))
-        file_handler.setLevel(logging.INFO)
-        app.logger.addHandler(file_handler)
+    file_handler.setLevel(logging.INFO)
+    app.logger.addHandler(file_handler)
+    
+    # Настраиваем логирование для модулей
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s [%(levelname)s] [%(name)s] %(message)s',
+        handlers=[file_handler]
+    )
+    
+    # Устанавливаем уровень логирования для наших модулей
+    logging.getLogger('src.scenario_executor').setLevel(logging.INFO)
+    logging.getLogger('src.ai_client').setLevel(logging.INFO)
     
     app.logger.setLevel(logging.INFO)
     app.logger.info('AI Manager startup')

@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 import sys
+import logging
 
 # Добавляем src в путь
 sys.path.insert(0, str(Path(__file__).parent))
@@ -18,6 +19,9 @@ try:
     from csv_to_excel import CSVToExcelAppender
 except ImportError:
     CSVToExcelAppender = None
+
+# Настраиваем логирование
+logger = logging.getLogger(__name__)
 
 
 class ScenarioExecutor:
@@ -80,11 +84,23 @@ class ScenarioExecutor:
                 message='Инициализация обработки...'
             )
         
+        # Проверяем, не отменена ли задача
+        if self.status_manager and self.task_id:
+            if self.status_manager.is_cancelled(self.task_id):
+                logger.info(f"[{self.task_id}] ⛔ Задача отменена до начала обработки")
+                return {
+                    'success': False,
+                    'results': {},
+                    'errors': ['Задача отменена пользователем']
+                }
+        
         # Инициализируем AI клиент
+        logger.info(f"[{self.task_id}] 🤖 Инициализация AI клиента: {ai_provider}")
         if ai_provider == 'jayflow':
             ai_client = JayFlowClient()
         else:
             ai_client = OpenAIClient()
+        logger.info(f"[{self.task_id}] ✅ AI клиент инициализирован")
         
         # Обрабатываем основной промпт
         excel_path = None
@@ -93,6 +109,7 @@ class ScenarioExecutor:
         
         if self.scenario['prompts']['main'].get('enabled'):
             current_step += 1
+            logger.info(f"[{self.task_id}] 📝 Начало обработки основного промпта (шаг {current_step}/{total_steps})")
             if self.status_manager and self.task_id:
                 self.status_manager.update_status(
                     self.task_id,
@@ -101,6 +118,15 @@ class ScenarioExecutor:
                     message='Обработка основного промпта (технические характеристики)...',
                     progress=int((current_step / total_steps) * 100) if total_steps > 0 else 0
                 )
+            
+            # Проверяем отмену перед обработкой
+            if self.status_manager and self.task_id and self.status_manager.is_cancelled(self.task_id):
+                logger.info(f"[{self.task_id}] ⛔ Задача отменена перед обработкой основного промпта")
+                return {
+                    'success': False,
+                    'results': {},
+                    'errors': ['Задача отменена пользователем']
+                }
             
             result = self._process_main_prompt(converted_text, ai_client, output_prefix)
             if result:
@@ -133,7 +159,17 @@ class ScenarioExecutor:
         
         for prompt_type in additional_types:
             if self.scenario['prompts'][prompt_type].get('enabled'):
+                # Проверяем отмену перед каждым промптом
+                if self.status_manager and self.task_id and self.status_manager.is_cancelled(self.task_id):
+                    logger.info(f"[{self.task_id}] ⛔ Задача отменена перед обработкой промпта {prompt_type}")
+                    return {
+                        'success': False,
+                        'results': self.results,
+                        'errors': self.errors + ['Задача отменена пользователем']
+                    }
+                
                 current_step += 1
+                logger.info(f"[{self.task_id}] 📝 Начало обработки промпта {prompt_type} (шаг {current_step}/{total_steps})")
                 if self.status_manager and self.task_id:
                     self.status_manager.update_status(
                         self.task_id,
@@ -179,11 +215,13 @@ class ScenarioExecutor:
     def _process_main_prompt(self, converted_text: str, ai_client, output_prefix: str) -> Optional[Dict]:
         """Обрабатывает основной промпт (JSON + Excel)"""
         try:
+            logger.info(f"[{self.task_id}] 📋 Чтение конфигурации основного промпта")
             prompt_config = self.scenario['prompts']['main']
             prompt_file = self.project_root / prompt_config['file']
             tz_template = self.project_root / prompt_config['tz_template']
             glossary = self.project_root / prompt_config['glossary']
             
+            logger.info(f"[{self.task_id}] 🔨 Построение промпта (файл: {prompt_file.name})")
             # Строим промпт
             prompt_builder = PromptBuilder(
                 prompt_file=str(prompt_file),
@@ -194,6 +232,7 @@ class ScenarioExecutor:
             
             # Сохраняем размер промпта для метрик
             prompt_size = len(final_prompt)
+            logger.info(f"[{self.task_id}] ✅ Промпт построен: {prompt_size:,} символов (~{prompt_size // 4:,} токенов)")
             
             # Обновляем статус с размером промпта
             if self.status_manager and self.task_id:
@@ -203,13 +242,23 @@ class ScenarioExecutor:
                     metrics={'prompt_size': prompt_size}
                 )
             
-            # Отправляем в AI
-            result = ai_client.process_prompt(final_prompt)
-            
-            if not result['success']:
-                self.errors.append(f"Ошибка обработки основного промпта: {result.get('error')}")
+            # Проверяем отмену перед отправкой
+            if self.status_manager and self.task_id and self.status_manager.is_cancelled(self.task_id):
+                logger.info(f"[{self.task_id}] ⛔ Задача отменена перед отправкой основного промпта")
                 return None
             
+            # Отправляем в AI
+            logger.info(f"[{self.task_id}] 🚀 Отправка основного промпта в AI...")
+            result = ai_client.process_prompt(final_prompt)
+            logger.info(f"[{self.task_id}] 📥 Получен ответ от AI (success: {result.get('success')})")
+            
+            if not result['success']:
+                error_msg = result.get('error', 'Неизвестная ошибка')
+                logger.error(f"[{self.task_id}] ❌ Ошибка обработки основного промпта: {error_msg}")
+                self.errors.append(f"Ошибка обработки основного промпта: {error_msg}")
+                return None
+            
+            logger.info(f"[{self.task_id}] 💾 Сохранение JSON результата...")
             # Сохраняем JSON
             json_filename = f"{output_prefix}_filled.json"
             json_path = self.project_root / "results" / json_filename
@@ -217,8 +266,10 @@ class ScenarioExecutor:
             
             with open(json_path, 'w', encoding='utf-8') as f:
                 json.dump(result['json'], f, ensure_ascii=False, indent=2)
+            logger.info(f"[{self.task_id}] ✅ JSON сохранен: {json_path.name} ({json_path.stat().st_size:,} байт)")
             
             # Конвертируем в Excel
+            logger.info(f"[{self.task_id}] 📊 Конвертация в Excel...")
             excel_filename = f"{output_prefix}_filled.xlsx"
             excel_path = self.project_root / "results" / excel_filename
             
@@ -226,8 +277,9 @@ class ScenarioExecutor:
                 excel_converter = JSONToExcelConverter()
                 excel_converter.convert(result['json'], str(excel_path))
                 excel_available = True
+                logger.info(f"[{self.task_id}] ✅ Excel создан: {excel_path.name} ({excel_path.stat().st_size:,} байт)")
             except Exception as e:
-                print(f"⚠️  Ошибка создания Excel файла: {e}")
+                logger.error(f"[{self.task_id}] ⚠️  Ошибка создания Excel файла: {e}")
                 excel_available = False
                 excel_path = None
             
@@ -250,13 +302,17 @@ class ScenarioExecutor:
                                    ai_client, output_prefix: str, excel_path: Optional[str] = None) -> Optional[Dict]:
         """Обрабатывает дополнительный промпт (CSV → Excel лист)"""
         try:
+            logger.info(f"[{self.task_id}] 📋 Чтение конфигурации промпта {prompt_type}")
             prompt_config = self.scenario['prompts'][prompt_type]
             prompt_file = self.project_root / prompt_config['file']
             
             if not prompt_file.exists():
-                self.errors.append(f"Файл промпта не найден: {prompt_file}")
+                error_msg = f"Файл промпта не найден: {prompt_file}"
+                logger.error(f"[{self.task_id}] ❌ {error_msg}")
+                self.errors.append(error_msg)
                 return None
             
+            logger.info(f"[{self.task_id}] 📖 Чтение шаблона промпта: {prompt_file.name}")
             # Читаем промпт
             with open(prompt_file, 'r', encoding='utf-8') as f:
                 prompt_template = f.read()
@@ -267,15 +323,32 @@ class ScenarioExecutor:
             final_prompt = final_prompt.replace('Текст ТЗ:', converted_text)
             final_prompt = final_prompt.replace('Текст ТЗ\n', converted_text + '\n')
             
+            prompt_size = len(final_prompt)
+            logger.info(f"[{self.task_id}] ✅ Промпт {prompt_type} подготовлен: {prompt_size:,} символов (~{prompt_size // 4:,} токенов)")
+            
+            # Проверяем отмену перед отправкой
+            if self.status_manager and self.task_id and self.status_manager.is_cancelled(self.task_id):
+                logger.info(f"[{self.task_id}] ⛔ Задача отменена перед отправкой промпта {prompt_type}")
+                return None
+            
             # Отправляем в AI (текстовый ответ, не JSON)
+            logger.info(f"[{self.task_id}] 🚀 Отправка промпта {prompt_type} в AI...")
             result = ai_client.process_prompt_text(final_prompt)
+            logger.info(f"[{self.task_id}] 📥 Получен ответ от AI для {prompt_type} (success: {result.get('success')})")
             
             if not result['success']:
-                self.errors.append(f"Ошибка обработки промпта {prompt_type}: {result.get('error')}")
+                error_msg = result.get('error', 'Неизвестная ошибка')
+                logger.error(f"[{self.task_id}] ❌ Ошибка обработки промпта {prompt_type}: {error_msg}")
+                self.errors.append(f"Ошибка обработки промпта {prompt_type}: {error_msg}")
                 return None
+            
+            logger.info(f"[{self.task_id}] 📄 Парсинг CSV из ответа для {prompt_type}...")
+            response_text = result.get('text', '')
+            logger.info(f"[{self.task_id}] 📏 Размер ответа: {len(response_text):,} символов")
             
             # Если нет Excel файла, создаем пустой
             if not excel_path or not Path(excel_path).exists():
+                logger.info(f"[{self.task_id}] 📊 Создание нового Excel файла...")
                 from openpyxl import Workbook
                 excel_filename = f"{output_prefix}_filled.xlsx"
                 excel_path = self.project_root / "results" / excel_filename
@@ -287,14 +360,18 @@ class ScenarioExecutor:
                     wb.remove(wb.active)
                 wb.save(str(excel_path))
                 excel_path = str(excel_path)
+                logger.info(f"[{self.task_id}] ✅ Excel файл создан: {excel_path}")
             
             # Парсим CSV из ответа
             if CSVToExcelAppender is None:
-                self.errors.append(f"CSVToExcelAppender не доступен для промпта {prompt_type}")
+                error_msg = f"CSVToExcelAppender не доступен для промпта {prompt_type}"
+                logger.error(f"[{self.task_id}] ❌ {error_msg}")
+                self.errors.append(error_msg)
                 return None
             
             csv_appender = CSVToExcelAppender()
             csv_text = csv_appender.parse_csv_from_text(result['text'])
+            logger.info(f"[{self.task_id}] ✅ CSV распарсен: {len(csv_text):,} символов")
             
             # Имена листов
             sheet_names = {
@@ -305,6 +382,7 @@ class ScenarioExecutor:
             }
             
             # Добавляем лист в Excel
+            logger.info(f"[{self.task_id}] 📊 Добавление листа '{sheet_names.get(prompt_type, prompt_type)}' в Excel...")
             try:
                 csv_appender.add_csv_sheet(
                     excel_path,
@@ -312,8 +390,9 @@ class ScenarioExecutor:
                     sheet_names.get(prompt_type, prompt_type)
                 )
                 sheet_added = True
+                logger.info(f"[{self.task_id}] ✅ Лист '{sheet_names.get(prompt_type, prompt_type)}' успешно добавлен")
             except Exception as e:
-                print(f"⚠️  Ошибка добавления листа {prompt_type}: {e}")
+                logger.error(f"[{self.task_id}] ⚠️  Ошибка добавления листа {prompt_type}: {e}")
                 import traceback
                 traceback.print_exc()
                 sheet_added = False

@@ -10,6 +10,10 @@ from typing import Optional, Dict, Any
 import re
 from pathlib import Path
 from datetime import datetime
+import logging
+
+# Настраиваем логирование
+logger = logging.getLogger(__name__)
 
 
 class OpenAIClient:
@@ -127,6 +131,9 @@ class OpenAIClient:
             print(f"⚠️  Внимание: Очень большой промпт (~{estimated_tokens:,} токенов). Это может вызвать ошибки.")
         
         try:
+            logger.info(f"🚀 Отправка запроса в OpenAI API (модель: {self.model}, промпт: {prompt_size:,} символов)")
+            start_time = time.time()
+            
             # Минимальный запрос - только model и messages
             # Не ограничиваем контекст и не передаем лишние параметры
             response = client.chat.completions.create(
@@ -143,9 +150,23 @@ class OpenAIClient:
                 ]
             )
             
+            elapsed_time = time.time() - start_time
+            logger.info(f"✅ Получен ответ от OpenAI API за {elapsed_time:.2f} секунд")
+            
             # Извлекаем контент из ответа
             content = response.choices[0].message.content if response.choices else None
             finish_reason = response.choices[0].finish_reason if response.choices else None
+            
+            # Логируем информацию об использовании токенов
+            if response.usage:
+                logger.info(f"📊 Использовано токенов: {response.usage.total_tokens:,} "
+                          f"(промпт: {response.usage.prompt_tokens:,}, "
+                          f"ответ: {response.usage.completion_tokens:,})")
+            
+            if content:
+                logger.info(f"📥 Размер ответа: {len(content):,} символов")
+            else:
+                logger.warning(f"⚠️  Пустой ответ от API (finish_reason: {finish_reason})")
             
             # Проверяем, что контент не пустой
             if not content or not content.strip():
@@ -497,7 +518,12 @@ class OpenAIClient:
                 'error': str или None
             }
         """
+        logger.info(f"🔄 Начало обработки промпта (длина: {len(prompt):,} символов, max_retries: {max_retries})")
+        
         for attempt in range(max_retries + 1):
+            if attempt > 0:
+                logger.info(f"🔄 Повторная попытка {attempt}/{max_retries}")
+            
             # Создаем временную метку для связанных файлов (промпт и ответ)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             
@@ -505,24 +531,32 @@ class OpenAIClient:
             response = self._make_request(prompt, save_prompt=(attempt == 0), timestamp=timestamp)
             
             if not response['success']:
+                error_type = response.get('error_type', 'unknown')
+                error_msg = response.get('error', 'Неизвестная ошибка')
+                logger.warning(f"⚠️  Ошибка запроса (попытка {attempt + 1}/{max_retries + 1}, тип: {error_type}): {error_msg[:200]}")
+                
                 if attempt < max_retries and response.get('error_type') == 'rate_limit':
                     # Ждем перед повтором при rate limit
                     wait_time = (attempt + 1) * 2
+                    logger.info(f"⏳ Ожидание {wait_time} секунд перед повтором...")
                     time.sleep(wait_time)
                     continue
+                logger.error(f"❌ Обработка промпта завершена с ошибкой после {attempt + 1} попыток")
                 return {
                     'success': False,
                     'json': None,
                     'raw_response': None,
                     'usage': None,
-                    'error': response.get('error', 'Неизвестная ошибка')
+                    'error': error_msg
                 }
             
             # Извлекаем JSON из ответа
+            logger.info(f"🔍 Извлечение JSON из ответа...")
             content = response['content']
             json_data = self.extract_json(content)
             
             if json_data:
+                logger.info(f"✅ JSON успешно извлечен (размер: {len(json.dumps(json_data)):,} символов)")
                 return {
                     'success': True,
                     'json': json_data,
@@ -532,11 +566,14 @@ class OpenAIClient:
                 }
             else:
                 # Если не удалось извлечь JSON, сохраняем ответ для отладки
+                logger.warning(f"⚠️  Не удалось извлечь JSON из ответа (попытка {attempt + 1}/{max_retries + 1})")
                 debug_file = self._save_debug_response(content, prompt, timestamp)
                 
                 # Если не удалось извлечь JSON, возвращаем ошибку
                 if attempt < max_retries:
+                    logger.info(f"🔄 Повторная попытка извлечения JSON...")
                     continue
+                logger.error(f"❌ Не удалось извлечь JSON после {max_retries + 1} попыток")
                 return {
                     'success': False,
                     'json': None,
@@ -573,25 +610,37 @@ class OpenAIClient:
                 'error': str или None
             }
         """
+        logger.info(f"🔄 Начало обработки текстового промпта (длина: {len(prompt):,} символов, max_retries: {max_retries})")
+        
         for attempt in range(max_retries + 1):
+            if attempt > 0:
+                logger.info(f"🔄 Повторная попытка {attempt}/{max_retries}")
+            
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             response = self._make_request(prompt, save_prompt=(attempt == 0), timestamp=timestamp)
             
             if not response['success']:
+                error_type = response.get('error_type', 'unknown')
+                error_msg = response.get('error', 'Неизвестная ошибка')
+                logger.warning(f"⚠️  Ошибка запроса (попытка {attempt + 1}/{max_retries + 1}, тип: {error_type}): {error_msg[:200]}")
+                
                 if attempt < max_retries and response.get('error_type') == 'rate_limit':
                     wait_time = (attempt + 1) * 2
+                    logger.info(f"⏳ Ожидание {wait_time} секунд перед повтором...")
                     time.sleep(wait_time)
                     continue
+                logger.error(f"❌ Обработка текстового промпта завершена с ошибкой после {attempt + 1} попыток")
                 return {
                     'success': False,
                     'text': None,
                     'raw_response': None,
                     'usage': None,
-                    'error': response.get('error', 'Неизвестная ошибка')
+                    'error': error_msg
                 }
             
             # Возвращаем текст как есть
             content = response['content']
+            logger.info(f"✅ Получен текстовый ответ: {len(content):,} символов")
             
             return {
                 'success': True,
