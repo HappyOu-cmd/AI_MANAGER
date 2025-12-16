@@ -301,9 +301,21 @@ document.addEventListener('DOMContentLoaded', function() {
             if (statusPollInterval) {
                 clearInterval(statusPollInterval);
                 statusPollInterval = null;
+                console.log('✅ Polling остановлен после получения ответа от /upload');
             }
             
+            // Очищаем сохраненный task_id при успехе
             if (response.ok && data.success) {
+                localStorage.removeItem('currentTaskId');
+                localStorage.removeItem('taskStartTime');
+                currentTaskId = null;
+                
+                // Скрываем кнопку остановки
+                const cancelBtn = document.getElementById('cancelBtn');
+                if (cancelBtn) {
+                    cancelBtn.style.display = 'none';
+                }
+                
                 // Завершаем все шаги
                 completeAllProgressSteps();
                 showSuccess(data);
@@ -400,8 +412,23 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     }
                 } else if (response.status === 404) {
-                    // Задача еще не создана на сервере, продолжаем попытки
-                    console.log('⏳ Задача еще не создана на сервере, ожидание...');
+                    // Если задача не найдена, но мы уже видели статус "processing" или "completed",
+                    // значит задача завершилась и статус был удален
+                    // Проверяем, не завершилась ли обработка (если прошло больше 30 секунд с начала)
+                    const taskStartTime = localStorage.getItem('taskStartTime');
+                    if (taskStartTime) {
+                        const elapsed = (Date.now() - parseInt(taskStartTime)) / 1000;
+                        if (elapsed > 30) {
+                            // Задача, вероятно, завершилась, но статус удален
+                            // Пытаемся получить результат через основной endpoint
+                            console.log('⏳ Задача не найдена, но прошло достаточно времени. Проверяем результаты...');
+                            // Не останавливаем polling сразу, продолжаем попытки еще немного
+                        } else {
+                            console.log('⏳ Задача еще не создана на сервере, ожидание...');
+                        }
+                    } else {
+                        console.log('⏳ Задача еще не создана на сервере, ожидание...');
+                    }
                 } else {
                     console.warn('⚠️ Ошибка получения статуса:', response.status, response.statusText);
                 }

@@ -97,6 +97,21 @@ class ProcessingStatus:
             except Exception as e:
                 print(f"⚠️  Ошибка удаления статуса: {e}")
     
+    def cleanup_old_statuses(self, max_age_minutes: int = 10):
+        """Удаляет старые статусы (старше max_age_minutes минут)"""
+        import time
+        current_time = time.time()
+        max_age_seconds = max_age_minutes * 60
+        
+        with self._lock:
+            for status_file in self.status_dir.glob("*.json"):
+                try:
+                    file_age = current_time - status_file.stat().st_mtime
+                    if file_age > max_age_seconds:
+                        status_file.unlink()
+                except Exception as e:
+                    print(f"⚠️  Ошибка удаления старого статуса {status_file}: {e}")
+    
     def add_error(self, task_id: str, error: str):
         """Добавляет ошибку в статус"""
         status = self.get_status(task_id)

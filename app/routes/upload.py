@@ -192,8 +192,17 @@ def upload_file():
                         if 'main' in response_data['results']:
                             response_data['results']['main']['sheets'].append(sheet_result['sheet_name'])
             
-            # Удаляем статус после успешного завершения
-            status_manager.delete_status(task_id)
+            # Обновляем статус на "completed" перед возвратом ответа
+            # Статус будет удален автоматически через cleanup_old_statuses или вручную позже
+            status_manager.update_status(
+                task_id,
+                status='completed',
+                progress=100,
+                message='Обработка завершена успешно'
+            )
+            
+            # Очищаем старые статусы (старше 10 минут)
+            status_manager.cleanup_old_statuses(max_age_minutes=10)
             
             return jsonify(response_data)
         
