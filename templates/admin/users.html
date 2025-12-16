@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Пользователи - Админ панель</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- Боковая панель -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                <div class="sidebar-logo-icon">🤖</div>
+                <div class="sidebar-logo-text">ИИ Менеджер</div>
+            </div>
+            <div class="sidebar-subtitle">Заполнение ТЗ</div>
+        </div>
+        
+        <nav class="sidebar-nav">
+            <a href="/" class="sidebar-nav-item">
+                <span class="sidebar-nav-item-icon">📄</span>
+                <span>Обработка документов</span>
+            </a>
+            <a href="/history" class="sidebar-nav-item">
+                <span class="sidebar-nav-item-icon">📚</span>
+                <span>Мои документы</span>
+            </a>
+            <a href="/admin" class="sidebar-nav-item active">
+                <span class="sidebar-nav-item-icon">⚙️</span>
+                <span>Админ панель</span>
+            </a>
+            <a href="/logs" class="sidebar-nav-item">
+                <span class="sidebar-nav-item-icon">📊</span>
+                <span>Логи активности</span>
+            </a>
+            <a href="/scenarios" class="sidebar-nav-item">
+                <span class="sidebar-nav-item-icon">⚙️</span>
+                <span>Сценарии</span>
+            </a>
+        </nav>
+        
+        <div class="sidebar-footer">
+            <div class="sidebar-user-info">
+                <div class="sidebar-user-name">{{ current_user.username }}</div>
+                <div class="sidebar-user-role">Администратор</div>
+                <a href="/auth/logout" class="sidebar-logout">Выйти</a>
+            </div>
+            <div class="sidebar-footer-text">ИИ Менеджер v1.0</div>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <div class="container">
+            <div class="page-header">
+                <h1>Пользователи</h1>
+                <p class="subtitle">Управление пользователями системы</p>
+            </div>
+
+            <div class="card" style="margin-bottom: 24px;">
+                <a href="{{ url_for('admin.register_user') }}" class="btn btn-primary">
+                    ➕ Зарегистрировать нового пользователя
+                </a>
+            </div>
+
+            <div class="card">
+                {% if users %}
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid var(--gray-300);">
+                                <th style="padding: 12px; text-align: left;">Имя пользователя</th>
+                                <th style="padding: 12px; text-align: left;">Email</th>
+                                <th style="padding: 12px; text-align: left;">Роль</th>
+                                <th style="padding: 12px; text-align: left;">Дата регистрации</th>
+                                <th style="padding: 12px; text-align: left;">Последний вход</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in users %}
+                            <tr style="border-bottom: 1px solid var(--gray-200);">
+                                <td style="padding: 12px;">{{ user.username }}</td>
+                                <td style="padding: 12px;">{{ user.email }}</td>
+                                <td style="padding: 12px;">
+                                    {% if user.is_admin %}
+                                    <span style="padding: 4px 8px; border-radius: 4px; font-size: 12px; background: var(--primary-red-lighter); color: var(--primary-red);">
+                                        Администратор
+                                    </span>
+                                    {% else %}
+                                    <span style="padding: 4px 8px; border-radius: 4px; font-size: 12px; background: var(--gray-200); color: var(--text);">
+                                        Пользователь
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <td style="padding: 12px;">{{ user.created_at.strftime('%d.%m.%Y %H:%M') if user.created_at else '-' }}</td>
+                                <td style="padding: 12px;">{{ user.last_login.strftime('%d.%m.%Y %H:%M') if user.last_login else 'Никогда' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Пагинация -->
+                {% if pagination.pages > 1 %}
+                <div style="margin-top: 24px; display: flex; justify-content: center; gap: 8px;">
+                    {% if pagination.has_prev %}
+                    <a href="?page={{ pagination.prev_num }}" class="btn btn-primary">← Назад</a>
+                    {% endif %}
+                    <span style="padding: 8px 16px; display: flex; align-items: center;">Страница {{ pagination.page }} из {{ pagination.pages }}</span>
+                    {% if pagination.has_next %}
+                    <a href="?page={{ pagination.next_num }}" class="btn btn-primary">Вперед →</a>
+                    {% endif %}
+                </div>
+                {% endif %}
+                {% else %}
+                <div style="padding: 48px; text-align: center; color: var(--text-light);">
+                    <div style="font-size: 48px; margin-bottom: 16px;">👥</div>
+                    <div>Пользователи не найдены</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </main>
+</body>
+</html>

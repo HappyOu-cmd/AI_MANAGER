@@ -14,8 +14,14 @@ bp = Blueprint('auth', __name__, url_prefix='/auth')
 
 
 @bp.route('/register', methods=['GET', 'POST'])
+@login_required
 def register():
-    """Регистрация нового пользователя"""
+    """Регистрация нового пользователя (только для администраторов)"""
+    # Проверка прав администратора
+    if not current_user.is_admin:
+        flash('Только администратор может регистрировать новых пользователей', 'error')
+        return redirect(url_for('main.index'))
+    
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         email = request.form.get('email', '').strip()

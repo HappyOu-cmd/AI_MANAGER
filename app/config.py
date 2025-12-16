@@ -49,7 +49,7 @@ class Config:
     # Настройки Flask
     JSON_AS_ASCII = False
     JSONIFY_PRETTYPRINT_REGULAR = True
-    
+
     # База данных
     BASE_DIR = Path(__file__).parent.parent
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or f'sqlite:///{BASE_DIR / "storage" / "app.db"}'

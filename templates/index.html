@@ -21,26 +21,25 @@
         </div>
         
         <nav class="sidebar-nav">
+            {% if current_user.is_authenticated %}
             <a href="/" class="sidebar-nav-item active">
                 <span class="sidebar-nav-item-icon">📄</span>
                 <span>Обработка документов</span>
             </a>
-            {% if current_user.is_authenticated %}
             <a href="/history" class="sidebar-nav-item">
                 <span class="sidebar-nav-item-icon">📚</span>
                 <span>Мои документы</span>
             </a>
             {% if current_user.is_admin %}
+            <a href="/admin" class="sidebar-nav-item">
+                <span class="sidebar-nav-item-icon">⚙️</span>
+                <span>Админ панель</span>
+            </a>
             <a href="/logs" class="sidebar-nav-item">
                 <span class="sidebar-nav-item-icon">📊</span>
                 <span>Логи активности</span>
             </a>
             {% endif %}
-            <a href="/scenarios" class="sidebar-nav-item">
-                <span class="sidebar-nav-item-icon">⚙️</span>
-                <span>Сценарии</span>
-            </a>
-            {% else %}
             <a href="/scenarios" class="sidebar-nav-item">
                 <span class="sidebar-nav-item-icon">⚙️</span>
                 <span>Сценарии</span>
@@ -56,12 +55,6 @@
                 <div class="sidebar-user-role">Администратор</div>
                 {% endif %}
                 <a href="/auth/logout" class="sidebar-logout">Выйти</a>
-            </div>
-            {% else %}
-            <div class="sidebar-auth-links">
-                <a href="/auth/login" class="sidebar-auth-link">Войти</a>
-                <span class="sidebar-auth-separator">|</span>
-                <a href="/auth/register" class="sidebar-auth-link">Регистрация</a>
             </div>
             {% endif %}
             <div class="sidebar-footer-text">ИИ Менеджер v1.0</div>
@@ -221,31 +214,10 @@
             <div class="card info-card">
                 <div class="card-header">
                     <div class="card-icon">ℹ️</div>
-                    <div class="card-title">Как это работает</div>
+                    <div class="card-title">Поддерживаемые форматы</div>
                 </div>
                 
                 <div class="info-grid">
-                    <div class="info-item">
-                        <div class="info-item-title">1. Загрузка документа</div>
-                        <div class="info-item-text">Загрузите ТЗ заказчика в формате PDF, Word или Excel</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-item-title">2. Автоматическая конвертация</div>
-                        <div class="info-item-text">Документ автоматически преобразуется в текст для анализа</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-item-title">3. Обработка ИИ</div>
-                        <div class="info-item-text">Искусственный интеллект анализирует текст и заполняет шаблон</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-item-title">4. Скачивание результата</div>
-                        <div class="info-item-text">Получите заполненный JSON и Excel файлы с результатами</div>
-                    </div>
-                </div>
-
-                <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--gray-200);">
-                    <div class="info-item-title" style="margin-bottom: 12px;">Поддерживаемые форматы</div>
-                    <div class="info-grid">
                         <div class="info-item">
                             <div class="info-item-title">PDF</div>
                             <div class="info-item-text">Извлекается весь текст из документа</div>

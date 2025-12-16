@@ -70,7 +70,7 @@ def create_app(config_class=Config):
     _setup_logging(app)
     
     # Регистрируем blueprints
-    from app.routes import main, upload, download, scenarios, auth, history, logs
+    from app.routes import main, upload, download, scenarios, auth, history, logs, admin
     app.register_blueprint(main.bp)
     app.register_blueprint(upload.bp)
     app.register_blueprint(download.bp)
@@ -78,6 +78,7 @@ def create_app(config_class=Config):
     app.register_blueprint(auth.bp)
     app.register_blueprint(history.bp)
     app.register_blueprint(logs.bp)
+    app.register_blueprint(admin.bp)
     
     # Регистрируем обработчики ошибок
     from app.utils.error_handlers import register_error_handlers
@@ -122,17 +123,17 @@ def _create_directories(app):
 def _setup_logging(app):
     """Настраивает систему логирования"""
     # Всегда логируем в файл (и в debug, и в production)
-    log_file = Path(app.config['LOG_FOLDER']) / 'app.log'
-    file_handler = RotatingFileHandler(
-        log_file,
-        maxBytes=10240000,  # 10MB
-        backupCount=10
-    )
-    file_handler.setFormatter(logging.Formatter(
+        log_file = Path(app.config['LOG_FOLDER']) / 'app.log'
+        file_handler = RotatingFileHandler(
+            log_file,
+            maxBytes=10240000,  # 10MB
+            backupCount=10
+        )
+        file_handler.setFormatter(logging.Formatter(
             '%(asctime)s [%(levelname)s] [%(name)s] %(message)s [in %(pathname)s:%(lineno)d]'
         ))
-    file_handler.setLevel(logging.INFO)
-    app.logger.addHandler(file_handler)
+        file_handler.setLevel(logging.INFO)
+        app.logger.addHandler(file_handler)
     
     # Настраиваем логирование для модулей
     logging.basicConfig(
@@ -154,19 +155,32 @@ def _create_default_admin(app):
     from app.models.user import User
     
     try:
-        admin = User.query.filter_by(username='admin').first()
+        # Проверяем существующего админа
+        admin = User.query.filter_by(username='kosharov.ilya.r').first()
         if not admin:
+            # Создаем нового админа
             admin = User(
-                username='admin',
-                email='admin@example.com',
+                username='kosharov.ilya.r',
+                email='kosharov.ilya.r@example.com',
                 is_admin=True
             )
-            admin.set_password('admin')  # Сменить при первом входе!
+            admin.set_password('hjvf25')
             db.session.add(admin)
             db.session.commit()
-            app.logger.info('✅ Создан администратор по умолчанию: admin/admin')
+            app.logger.info('✅ Создан администратор: kosharov.ilya.r')
         else:
-            app.logger.info('ℹ️  Администратор уже существует')
+            # Обновляем пароль существующего админа
+            admin.set_password('hjvf25')
+            admin.is_admin = True
+            db.session.commit()
+            app.logger.info('✅ Обновлен пароль администратора: kosharov.ilya.r')
+        
+        # Удаляем старого админа admin если он существует
+        old_admin = User.query.filter_by(username='admin').first()
+        if old_admin and old_admin.username != 'kosharov.ilya.r':
+            db.session.delete(old_admin)
+            db.session.commit()
+            app.logger.info('✅ Удален старый администратор: admin')
     except Exception as e:
         db.session.rollback()
         app.logger.warning(f'⚠️  Ошибка при создании администратора: {e}')
