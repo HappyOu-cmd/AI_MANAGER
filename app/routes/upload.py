@@ -330,6 +330,7 @@ def upload_file():
 
 
 @bp.route('/api/status/<task_id>', methods=['GET'])
+@login_required
 def api_get_status(task_id):
     """API: Получить статус обработки задачи"""
     status_manager = ProcessingStatus()
@@ -337,6 +338,20 @@ def api_get_status(task_id):
     
     if not status:
         return jsonify({'error': 'Задача не найдена'}), 404
+    
+    # Если обработка завершена, добавляем данные документа из БД
+    if status.get('status') == 'completed':
+        doc = Document.query.filter_by(task_id=task_id, user_id=current_user.id).first()
+        if doc:
+            status['document'] = {
+                'id': doc.id,
+                'json_file': doc.json_file,
+                'excel_file': doc.excel_file,
+                'json_url': f'/download_result/{doc.json_file}' if doc.json_file else None,
+                'excel_url': f'/download_result/{doc.excel_file}' if doc.excel_file else None,
+                'json_size': doc.json_size,
+                'excel_size': doc.excel_size
+            }
     
     return jsonify(status)
 

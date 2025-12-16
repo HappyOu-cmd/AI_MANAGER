@@ -446,6 +446,30 @@ document.addEventListener('DOMContentLoaded', function() {
                             showError(status.message || 'Произошла ошибка при обработке');
                         } else if (status.status === 'cancelled') {
                             showError('Обработка отменена пользователем');
+                        } else if (status.status === 'completed' && status.document) {
+                            // Если есть данные документа, показываем успех с кнопками скачивания
+                            const doc = status.document;
+                            const successData = {
+                                success: true,
+                                message: 'Обработка завершена успешно',
+                                task_id: taskId,
+                                results: {
+                                    main: {
+                                        json_file: doc.json_file,
+                                        json_size: doc.json_size || 0,
+                                        json_url: doc.json_url,
+                                        excel_file: doc.excel_file,
+                                        excel_size: doc.excel_size || 0,
+                                        excel_url: doc.excel_url,
+                                        sheets: []
+                                    }
+                                },
+                                metrics: status.metrics || {}
+                            };
+                            showSuccess(successData);
+                        } else if (status.status === 'completed') {
+                            // Если нет данных документа, просто показываем сообщение
+                            showError('Обработка завершена, но данные документа не найдены. Проверьте "Мои документы".');
                         }
                     }
                 } else if (response.status === 404) {
