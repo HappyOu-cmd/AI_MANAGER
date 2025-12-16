@@ -98,17 +98,6 @@ def download_result(filename):
             current_app.logger.error(f"   Найдено файлов с task_id: {[f.name for f in files]}")
         return jsonify({'error': 'Файл не найден'}), 404
     
-    if not doc:
-        # Если документ не найден в БД, проверяем, может это старый файл
-        # Для безопасности запрещаем доступ, если нет записи в БД
-        current_app.logger.warning(f"⚠️ Попытка скачать файл без записи в БД: {safe_filename} пользователем {current_user.username}")
-        abort(403)
-    
-    # Проверяем, что файл принадлежит текущему пользователю
-    if doc.user_id != current_user.id:
-        current_app.logger.warning(f"⚠️ Попытка несанкционированного доступа: пользователь {current_user.username} пытается скачать файл пользователя {doc.user_id}")
-        abort(403)
-    
     # Логируем скачивание
     try:
         log_entry = ActivityLog(
@@ -116,7 +105,7 @@ def download_result(filename):
             username=current_user.username,
             ip_address=request.remote_addr,
             action='download',
-            details=f'Скачивание файла: {safe_filename}',
+            details=f'Скачивание файла: {file_to_download}',
             task_id=doc.task_id
         )
         db.session.add(log_entry)
@@ -126,9 +115,9 @@ def download_result(filename):
         current_app.logger.warning(f"⚠️  Ошибка логирования скачивания: {e}")
     
     # Определяем MIME тип по расширению
-    if filename.endswith('.xlsx'):
+    if filename.endswith('.xlsx') or file_to_download.endswith('.xlsx'):
         mimetype = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    elif filename.endswith('.json'):
+    elif filename.endswith('.json') or file_to_download.endswith('.json'):
         mimetype = 'application/json'
     else:
         mimetype = 'application/octet-stream'
@@ -136,7 +125,7 @@ def download_result(filename):
     return send_file(
         str(file_path),
         as_attachment=True,
-        download_name=filename,
+        download_name=file_to_download,
         mimetype=mimetype
     )
 
