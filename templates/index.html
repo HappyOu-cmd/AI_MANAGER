@@ -25,13 +25,45 @@
                 <span class="sidebar-nav-item-icon">📄</span>
                 <span>Обработка документов</span>
             </a>
+            {% if current_user.is_authenticated %}
+            <a href="/history" class="sidebar-nav-item">
+                <span class="sidebar-nav-item-icon">📚</span>
+                <span>Мои документы</span>
+            </a>
+            {% if current_user.is_admin %}
+            <a href="/logs" class="sidebar-nav-item">
+                <span class="sidebar-nav-item-icon">📊</span>
+                <span>Логи активности</span>
+            </a>
+            {% endif %}
             <a href="/scenarios" class="sidebar-nav-item">
                 <span class="sidebar-nav-item-icon">⚙️</span>
                 <span>Сценарии</span>
             </a>
+            {% else %}
+            <a href="/scenarios" class="sidebar-nav-item">
+                <span class="sidebar-nav-item-icon">⚙️</span>
+                <span>Сценарии</span>
+            </a>
+            {% endif %}
         </nav>
         
         <div class="sidebar-footer">
+            {% if current_user.is_authenticated %}
+            <div class="sidebar-user-info">
+                <div class="sidebar-user-name">{{ current_user.username }}</div>
+                {% if current_user.is_admin %}
+                <div class="sidebar-user-role">Администратор</div>
+                {% endif %}
+                <a href="/auth/logout" class="sidebar-logout">Выйти</a>
+            </div>
+            {% else %}
+            <div class="sidebar-auth-links">
+                <a href="/auth/login" class="sidebar-auth-link">Войти</a>
+                <span class="sidebar-auth-separator">|</span>
+                <a href="/auth/register" class="sidebar-auth-link">Регистрация</a>
+            </div>
+            {% endif %}
             <div class="sidebar-footer-text">ИИ Менеджер v1.0</div>
         </div>
     </aside>
@@ -45,6 +77,18 @@
                 <p class="subtitle">Загрузите документ и получите заполненное ТЗ с помощью ИИ</p>
             </div>
 
+            {% if require_login %}
+            <!-- Сообщение о необходимости входа -->
+            <div class="card" style="text-align: center; padding: 48px;">
+                <div style="font-size: 64px; margin-bottom: 16px;">🔐</div>
+                <h2 style="margin-bottom: 16px;">Требуется авторизация</h2>
+                <p style="color: var(--text-light); margin-bottom: 24px;">Для обработки документов необходимо войти в систему</p>
+                <div style="display: flex; gap: 16px; justify-content: center;">
+                    <a href="/auth/login" class="btn btn-primary">Войти</a>
+                    <a href="/auth/register" class="btn btn-secondary">Регистрация</a>
+                </div>
+            </div>
+            {% else %}
             <!-- Карточка загрузки -->
             <div class="card upload-card">
                 <div class="card-header">
@@ -151,6 +195,7 @@
                     </div>
                 </form>
             </div>
+            {% endif %}
 
             <!-- Результаты -->
             <div class="card result-card" id="resultSection" style="display: none;">

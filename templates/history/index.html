@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мои документы - ИИ Менеджер</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- Боковая панель (та же, что на главной) -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                <div class="sidebar-logo-icon">🤖</div>
+                <div class="sidebar-logo-text">ИИ Менеджер</div>
+            </div>
+            <div class="sidebar-subtitle">Заполнение ТЗ</div>
+        </div>
+        
+        <nav class="sidebar-nav">
+            <a href="/" class="sidebar-nav-item">
+                <span class="sidebar-nav-item-icon">📄</span>
+                <span>Обработка документов</span>
+            </a>
+            <a href="/history" class="sidebar-nav-item active">
+                <span class="sidebar-nav-item-icon">📚</span>
+                <span>Мои документы</span>
+            </a>
+            {% if current_user.is_admin %}
+            <a href="/logs" class="sidebar-nav-item">
+                <span class="sidebar-nav-item-icon">📊</span>
+                <span>Логи активности</span>
+            </a>
+            {% endif %}
+            <a href="/scenarios" class="sidebar-nav-item">
+                <span class="sidebar-nav-item-icon">⚙️</span>
+                <span>Сценарии</span>
+            </a>
+        </nav>
+        
+        <div class="sidebar-footer">
+            <div class="sidebar-user-info">
+                <div class="sidebar-user-name">{{ current_user.username }}</div>
+                {% if current_user.is_admin %}
+                <div class="sidebar-user-role">Администратор</div>
+                {% endif %}
+                <a href="/auth/logout" class="sidebar-logout">Выйти</a>
+            </div>
+            <div class="sidebar-footer-text">ИИ Менеджер v1.0</div>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <div class="container">
+            <div class="page-header">
+                <h1>Мои документы</h1>
+                <p class="subtitle">История обработанных документов</p>
+            </div>
+
+            <!-- Фильтры -->
+            <div class="card" style="margin-bottom: 24px;">
+                <form method="GET" style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
+                    <select name="status" class="form-select" style="flex: 1; min-width: 200px;">
+                        <option value="all" {% if status_filter == 'all' %}selected{% endif %}>Все статусы</option>
+                        <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>Завершено</option>
+                        <option value="error" {% if status_filter == 'error' %}selected{% endif %}>Ошибка</option>
+                        <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>Отменено</option>
+                    </select>
+                    <button type="submit" class="btn btn-primary">Применить фильтр</button>
+                </form>
+            </div>
+
+            <!-- Список документов -->
+            <div class="card">
+                {% if documents %}
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid var(--gray-300);">
+                                <th style="padding: 12px; text-align: left;">Файл</th>
+                                <th style="padding: 12px; text-align: left;">Сценарий</th>
+                                <th style="padding: 12px; text-align: left;">AI</th>
+                                <th style="padding: 12px; text-align: left;">Статус</th>
+                                <th style="padding: 12px; text-align: left;">Дата</th>
+                                <th style="padding: 12px; text-align: left;">Время</th>
+                                <th style="padding: 12px; text-align: left;">Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for doc in documents %}
+                            <tr style="border-bottom: 1px solid var(--gray-200);">
+                                <td style="padding: 12px;">{{ doc.original_filename }}</td>
+                                <td style="padding: 12px;">{{ doc.scenario_id }}</td>
+                                <td style="padding: 12px;">{{ doc.ai_provider }}</td>
+                                <td style="padding: 12px;">
+                                    <span style="padding: 4px 8px; border-radius: 4px; font-size: 12px; 
+                                        {% if doc.status == 'completed' %}background: var(--success-lighter); color: var(--success);
+                                        {% elif doc.status == 'error' %}background: var(--primary-red-lighter); color: var(--primary-red);
+                                        {% else %}background: var(--gray-200); color: var(--text);{% endif %}">
+                                        {{ 'Завершено' if doc.status == 'completed' else ('Ошибка' if doc.status == 'error' else 'Отменено') }}
+                                    </span>
+                                </td>
+                                <td style="padding: 12px;">{{ doc.created_at.strftime('%d.%m.%Y %H:%M') if doc.created_at else '-' }}</td>
+                                <td style="padding: 12px;">{{ '%.1f'|format(doc.processing_time) }}с</td>
+                                <td style="padding: 12px;">
+                                    {% if doc.status == 'completed' %}
+                                    <div style="display: flex; gap: 8px;">
+                                        {% if doc.json_file %}
+                                        <a href="/download_result/{{ doc.json_file }}" class="btn btn-success" style="padding: 4px 12px; font-size: 12px;">JSON</a>
+                                        {% endif %}
+                                        {% if doc.excel_file %}
+                                        <a href="/download_result/{{ doc.excel_file }}" class="btn btn-success" style="padding: 4px 12px; font-size: 12px;">Excel</a>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Пагинация -->
+                {% if pagination.pages > 1 %}
+                <div style="margin-top: 24px; display: flex; justify-content: center; gap: 8px;">
+                    {% if pagination.has_prev %}
+                    <a href="?page={{ pagination.prev_num }}&status={{ status_filter }}" class="btn btn-primary">← Назад</a>
+                    {% endif %}
+                    <span style="padding: 8px 16px; display: flex; align-items: center;">Страница {{ pagination.page }} из {{ pagination.pages }}</span>
+                    {% if pagination.has_next %}
+                    <a href="?page={{ pagination.next_num }}&status={{ status_filter }}" class="btn btn-primary">Вперед →</a>
+                    {% endif %}
+                </div>
+                {% endif %}
+                {% else %}
+                <div style="padding: 48px; text-align: center; color: var(--text-light);">
+                    <div style="font-size: 48px; margin-bottom: 16px;">📭</div>
+                    <div>У вас пока нет обработанных документов</div>
+                    <a href="/" style="color: var(--primary-red); margin-top: 16px; display: inline-block;">Обработать первый документ</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </main>
+</body>
+</html>

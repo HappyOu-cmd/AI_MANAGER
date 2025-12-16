@@ -49,6 +49,16 @@ class Config:
     # Настройки Flask
     JSON_AS_ASCII = False
     JSONIFY_PRETTYPRINT_REGULAR = True
+    
+    # База данных
+    BASE_DIR = Path(__file__).parent.parent
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or f'sqlite:///{BASE_DIR / "storage" / "app.db"}'
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    
+    # Flask-Login
+    LOGIN_VIEW = 'auth.login'
+    LOGIN_MESSAGE = 'Пожалуйста, войдите в систему для доступа к этой странице.'
+    LOGIN_MESSAGE_CATEGORY = 'info'
 
 
 class DevelopmentConfig(Config):

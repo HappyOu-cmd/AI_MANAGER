@@ -24,6 +24,8 @@
     --text-dark: #1f1f1f;
     --text-gray: #525252;
     --text-light: #737373;
+    --success: #10b981;
+    --success-lighter: #d1fae5;
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
@@ -158,6 +160,59 @@ body {
     font-size: 12px;
     color: var(--text-light);
     text-align: center;
+    margin-top: 12px;
+}
+
+.sidebar-user-info {
+    margin-bottom: 12px;
+}
+
+.sidebar-user-name {
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 4px;
+}
+
+.sidebar-user-role {
+    font-size: 12px;
+    color: var(--primary-red);
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.sidebar-logout {
+    display: inline-block;
+    color: var(--text-light);
+    text-decoration: none;
+    font-size: 14px;
+    transition: var(--transition-fast);
+}
+
+.sidebar-logout:hover {
+    color: var(--primary-red);
+}
+
+.sidebar-auth-links {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.sidebar-auth-link {
+    color: var(--text-light);
+    text-decoration: none;
+    font-size: 14px;
+    transition: var(--transition-fast);
+}
+
+.sidebar-auth-link:hover {
+    color: var(--primary-red);
+}
+
+.sidebar-auth-separator {
+    color: var(--gray-400);
 }
 
 /* Основной контент */

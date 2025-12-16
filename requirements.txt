@@ -24,3 +24,8 @@ requests>=2.31.0
 # HTTP клиент для прокси (для OpenAI)
 httpx>=0.24.0
 
+# База данных и аутентификация
+Flask-SQLAlchemy>=3.0.0
+Flask-Login>=0.6.3
+Werkzeug>=3.0.0  # Для хеширования паролей
+

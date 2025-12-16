@@ -5,11 +5,13 @@ AI Manager - Flask Application Factory
 """
 
 from flask import Flask, request
+from flask_login import LoginManager
 from pathlib import Path
 import logging
 from logging.handlers import RotatingFileHandler
 
 from app.config import Config, ProductionConfig
+from app.models.db import db
 
 
 def create_app(config_class=Config):
@@ -45,15 +47,37 @@ def create_app(config_class=Config):
     # Создаем необходимые директории
     _create_directories(app)
     
+    # Инициализируем базу данных
+    db.init_app(app)
+    with app.app_context():
+        db.create_all()
+        # Создаем админа по умолчанию если его нет
+        _create_default_admin(app)
+    
+    # Настраиваем Flask-Login
+    login_manager = LoginManager()
+    login_manager.init_app(app)
+    login_manager.login_view = 'auth.login'
+    login_manager.login_message = 'Пожалуйста, войдите в систему.'
+    login_manager.login_message_category = 'info'
+    
+    @login_manager.user_loader
+    def load_user(user_id):
+        from app.models.user import User
+        return User.query.get(int(user_id))
+    
     # Настраиваем логирование
     _setup_logging(app)
     
     # Регистрируем blueprints
-    from app.routes import main, upload, download, scenarios
+    from app.routes import main, upload, download, scenarios, auth, history, logs
     app.register_blueprint(main.bp)
     app.register_blueprint(upload.bp)
     app.register_blueprint(download.bp)
     app.register_blueprint(scenarios.bp)
+    app.register_blueprint(auth.bp)
+    app.register_blueprint(history.bp)
+    app.register_blueprint(logs.bp)
     
     # Регистрируем обработчики ошибок
     from app.utils.error_handlers import register_error_handlers
@@ -123,4 +147,21 @@ def _setup_logging(app):
     
     app.logger.setLevel(logging.INFO)
     app.logger.info('AI Manager startup')
+
+
+def _create_default_admin(app):
+    """Создает администратора по умолчанию если его нет"""
+    from app.models.user import User
+    
+    admin = User.query.filter_by(username='admin').first()
+    if not admin:
+        admin = User(
+            username='admin',
+            email='admin@example.com',
+            is_admin=True
+        )
+        admin.set_password('admin')  # Сменить при первом входе!
+        db.session.add(admin)
+        db.session.commit()
+        app.logger.info('✅ Создан администратор по умолчанию: admin/admin')
 

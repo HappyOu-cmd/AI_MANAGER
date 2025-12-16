@@ -4,11 +4,13 @@
 """
 
 from flask import Blueprint, request, jsonify, current_app
+from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 from pathlib import Path
 import sys
 import uuid
 import re
+from datetime import datetime
 
 # Добавляем путь к src для импорта старых модулей
 project_root = Path(__file__).parent.parent.parent
@@ -18,6 +20,9 @@ from document_converter import DocumentConverter
 from scenario_manager import ScenarioManager
 from scenario_executor import ScenarioExecutor
 from processing_status import ProcessingStatus
+from app.models.db import db
+from app.models.document import Document
+from app.models.activity_log import ActivityLog
 
 bp = Blueprint('upload', __name__)
 
@@ -29,9 +34,19 @@ def allowed_file(filename):
 
 
 @bp.route('/upload', methods=['POST'])
+@login_required
 def upload_file():
     """Обработка загрузки, конвертации и заполнения ТЗ через ИИ"""
-    current_app.logger.info("📥 Получен запрос /upload")
+    # Логируем начало обработки
+    log_activity(
+        user_id=current_user.id,
+        username=current_user.username,
+        ip_address=request.remote_addr,
+        action='upload_start',
+        details=f'Начало обработки файла'
+    )
+    
+    current_app.logger.info(f"📥 Получен запрос /upload от пользователя {current_user.username}")
     
     if 'file' not in request.files:
         current_app.logger.warning("❌ Файл не найден в запросе")
@@ -125,6 +140,9 @@ def upload_file():
             # Получаем выбор AI из запроса
             ai_provider = request.form.get('ai_provider', 'openai').lower()
             
+            # Засекаем время начала обработки
+            processing_start_time = datetime.utcnow()
+            
             current_app.logger.info(f"[{task_id}] 🚀 Начало выполнения сценария '{scenario_id}' (AI: {ai_provider})")
             executor = ScenarioExecutor(scenario, status_manager=status_manager, task_id=task_id)
             # Используем task_id в output_prefix для уникальности при параллельной обработке
@@ -134,7 +152,48 @@ def upload_file():
                 ai_provider=ai_provider,
                 output_prefix=output_prefix
             )
+            
+            # Вычисляем время обработки
+            processing_end_time = datetime.utcnow()
+            processing_time = (processing_end_time - processing_start_time).total_seconds()
+            
             current_app.logger.info(f"[{task_id}] ✅ Сценарий выполнен (success: {result['success']}, ошибок: {len(result['errors'])})")
+            
+            # Получаем финальный статус с метриками
+            final_status = status_manager.get_status(task_id)
+            metrics = final_status.get('metrics', {}) if final_status else {}
+            
+            # Основной результат (JSON + Excel)
+            main_result = result['results'].get('main', {}) if result['success'] else {}
+            json_file = main_result.get('json_file')
+            excel_file = main_result.get('excel_file')
+            
+            # Сохраняем документ в базу данных
+            doc = Document(
+                user_id=current_user.id,
+                task_id=task_id,
+                original_filename=original_filename,
+                scenario_id=scenario_id,
+                ai_provider=ai_provider,
+                json_file=json_file,
+                excel_file=excel_file,
+                json_size=main_result.get('json_size', 0),
+                excel_size=main_result.get('excel_size', 0),
+                prompt_size=metrics.get('prompt_size', 0),
+                tokens_used=metrics.get('tokens_used', 0),
+                processing_time=processing_time,
+                status='completed' if result['success'] else 'error',
+                error_message='; '.join(result['errors']) if result['errors'] else None,
+                completed_at=processing_end_time if result['success'] else None
+            )
+            
+            try:
+                db.session.add(doc)
+                db.session.commit()
+                current_app.logger.info(f"[{task_id}] ✅ Документ сохранен в БД (ID: {doc.id})")
+            except Exception as e:
+                db.session.rollback()
+                current_app.logger.error(f"[{task_id}] ❌ Ошибка сохранения в БД: {e}")
             
             if not result['success']:
                 status_manager.update_status(
@@ -142,28 +201,36 @@ def upload_file():
                     status='error',
                     message=f'Ошибки: {"; ".join(result["errors"])}'
                 )
+                
+                # Логируем ошибку
+                log_activity(
+                    user_id=current_user.id,
+                    username=current_user.username,
+                    ip_address=request.remote_addr,
+                    action='upload_error',
+                    details=f'Ошибка обработки: {"; ".join(result["errors"])}',
+                    task_id=task_id
+                )
+                
                 return jsonify({
                     'error': f'Ошибка выполнения сценария: {"; ".join(result["errors"])}',
                     'stage': 'ai_processing',
                     'task_id': task_id
                 }), 500
             
-            # Получаем финальный статус с метриками
-            final_status = status_manager.get_status(task_id)
-            
             # Формируем ответ с результатами
             response_data = {
                 'success': True,
                 'message': 'ТЗ успешно обработано',
                 'task_id': task_id,
-                'metrics': final_status.get('metrics', {}) if final_status else {},
+                'document_id': doc.id,
+                'metrics': metrics,
                 'results': {}
             }
             
             # Основной результат (JSON + Excel)
             sheets_added = []
             if 'main' in result['results']:
-                main_result = result['results']['main']
                 response_data['results']['main'] = {
                     'json_file': main_result['json_file'],
                     'json_size': main_result['json_size'],
@@ -193,7 +260,6 @@ def upload_file():
                             response_data['results']['main']['sheets'].append(sheet_result['sheet_name'])
             
             # Обновляем статус на "completed" перед возвратом ответа
-            # Статус будет удален автоматически через cleanup_old_statuses или вручную позже
             status_manager.update_status(
                 task_id,
                 status='completed',
@@ -203,6 +269,16 @@ def upload_file():
             
             # Очищаем старые статусы (старше 10 минут)
             status_manager.cleanup_old_statuses(max_age_minutes=10)
+            
+            # Логируем успешное завершение
+            log_activity(
+                user_id=current_user.id,
+                username=current_user.username,
+                ip_address=request.remote_addr,
+                action='upload_completed',
+                details=f'Обработка завершена успешно: {original_filename}',
+                task_id=task_id
+            )
             
             return jsonify(response_data)
         
@@ -260,14 +336,38 @@ def api_get_status(task_id):
 
 
 @bp.route('/api/status/<task_id>/cancel', methods=['POST'])
+@login_required
 def api_cancel_task(task_id):
     """API: Остановить обработку задачи"""
-    current_app.logger.info(f"🛑 Запрос на остановку задачи: {task_id}")
+    current_app.logger.info(f"🛑 Запрос на остановку задачи: {task_id} от пользователя {current_user.username}")
+    
+    # Проверяем, что задача принадлежит пользователю
+    doc = Document.query.filter_by(task_id=task_id, user_id=current_user.id).first()
+    if not doc:
+        return jsonify({
+            'success': False,
+            'error': 'Задача не найдена или у вас нет прав на её отмену',
+            'task_id': task_id
+        }), 404
     
     status_manager = ProcessingStatus()
     success = status_manager.cancel_task(task_id)
     
     if success:
+        # Обновляем статус в БД
+        doc.status = 'cancelled'
+        db.session.commit()
+        
+        # Логируем отмену
+        log_activity(
+            user_id=current_user.id,
+            username=current_user.username,
+            ip_address=request.remote_addr,
+            action='upload_cancelled',
+            details=f'Обработка отменена пользователем',
+            task_id=task_id
+        )
+        
         current_app.logger.info(f"✅ Задача {task_id} успешно отменена")
         return jsonify({
             'success': True,
@@ -281,3 +381,21 @@ def api_cancel_task(task_id):
             'error': 'Задача не найдена или уже завершена',
             'task_id': task_id
         }), 404
+
+
+def log_activity(user_id=None, username=None, ip_address=None, action='', details='', task_id=None):
+    """Вспомогательная функция для логирования активности"""
+    try:
+        log_entry = ActivityLog(
+            user_id=user_id,
+            username=username,
+            ip_address=ip_address,
+            action=action,
+            details=details,
+            task_id=task_id
+        )
+        db.session.add(log_entry)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.warning(f"⚠️  Ошибка логирования активности: {e}")

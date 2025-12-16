@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Логи активности - ИИ Менеджер</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- Боковая панель -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                <div class="sidebar-logo-icon">🤖</div>
+                <div class="sidebar-logo-text">ИИ Менеджер</div>
+            </div>
+            <div class="sidebar-subtitle">Заполнение ТЗ</div>
+        </div>
+        
+        <nav class="sidebar-nav">
+            <a href="/" class="sidebar-nav-item">
+                <span class="sidebar-nav-item-icon">📄</span>
+                <span>Обработка документов</span>
+            </a>
+            <a href="/history" class="sidebar-nav-item">
+                <span class="sidebar-nav-item-icon">📚</span>
+                <span>Мои документы</span>
+            </a>
+            <a href="/logs" class="sidebar-nav-item active">
+                <span class="sidebar-nav-item-icon">📊</span>
+                <span>Логи активности</span>
+            </a>
+            <a href="/scenarios" class="sidebar-nav-item">
+                <span class="sidebar-nav-item-icon">⚙️</span>
+                <span>Сценарии</span>
+            </a>
+        </nav>
+        
+        <div class="sidebar-footer">
+            <div class="sidebar-user-info">
+                <div class="sidebar-user-name">{{ current_user.username }}</div>
+                <div class="sidebar-user-role">Администратор</div>
+                <a href="/auth/logout" class="sidebar-logout">Выйти</a>
+            </div>
+            <div class="sidebar-footer-text">ИИ Менеджер v1.0</div>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <div class="container">
+            <div class="page-header">
+                <h1>Логи активности</h1>
+                <p class="subtitle">Все действия пользователей на сайте</p>
+            </div>
+
+            <!-- Статистика -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
+                <div class="card">
+                    <div style="font-size: 32px; margin-bottom: 8px;">📊</div>
+                    <div style="font-size: 24px; font-weight: bold;">{{ total_logs }}</div>
+                    <div style="color: var(--text-light);">Всего записей</div>
+                </div>
+                <div class="card">
+                    <div style="font-size: 32px; margin-bottom: 8px;">👥</div>
+                    <div style="font-size: 24px; font-weight: bold;">{{ unique_users }}</div>
+                    <div style="color: var(--text-light);">Уникальных пользователей</div>
+                </div>
+            </div>
+
+            <!-- Фильтры -->
+            <div class="card" style="margin-bottom: 24px;">
+                <form method="GET" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 4px; font-size: 14px;">Действие</label>
+                        <select name="action" class="form-select">
+                            <option value="all" {% if action_filter == 'all' %}selected{% endif %}>Все действия</option>
+                            <option value="login">Вход</option>
+                            <option value="register">Регистрация</option>
+                            <option value="upload_start">Начало обработки</option>
+                            <option value="upload_completed">Завершение обработки</option>
+                            <option value="download">Скачивание</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 4px; font-size: 14px;">Пользователь</label>
+                        <input type="text" name="username" value="{{ username_filter }}" placeholder="Имя пользователя" class="form-select">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 4px; font-size: 14px;">Дата от</label>
+                        <input type="date" name="date_from" value="{{ date_from }}" class="form-select">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 4px; font-size: 14px;">Дата до</label>
+                        <input type="date" name="date_to" value="{{ date_to }}" class="form-select">
+                    </div>
+                    <div style="display: flex; align-items: flex-end;">
+                        <button type="submit" class="btn btn-primary" style="width: 100%;">Применить</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Топ действий -->
+            {% if top_actions %}
+            <div class="card" style="margin-bottom: 24px;">
+                <div style="font-weight: 600; margin-bottom: 12px;">Топ действий</div>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    {% for action, count in top_actions %}
+                    <div style="display: flex; justify-content: space-between; padding: 8px; background: var(--gray-50); border-radius: 4px;">
+                        <span>{{ action }}</span>
+                        <span style="font-weight: 600;">{{ count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Таблица логов -->
+            <div class="card">
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid var(--gray-300);">
+                                <th style="padding: 12px; text-align: left;">Время</th>
+                                <th style="padding: 12px; text-align: left;">Пользователь</th>
+                                <th style="padding: 12px; text-align: left;">Действие</th>
+                                <th style="padding: 12px; text-align: left;">Детали</th>
+                                <th style="padding: 12px; text-align: left;">IP</th>
+                                <th style="padding: 12px; text-align: left;">Task ID</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in logs %}
+                            <tr style="border-bottom: 1px solid var(--gray-200);">
+                                <td style="padding: 12px;">{{ log.created_at.strftime('%d.%m.%Y %H:%M:%S') if log.created_at else '-' }}</td>
+                                <td style="padding: 12px;">{{ log.username or 'anonymous' }}</td>
+                                <td style="padding: 12px;">
+                                    <span style="padding: 4px 8px; border-radius: 4px; font-size: 12px; background: var(--gray-100);">
+                                        {{ log.action }}
+                                    </span>
+                                </td>
+                                <td style="padding: 12px; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ log.details or '-' }}</td>
+                                <td style="padding: 12px;">{{ log.ip_address or '-' }}</td>
+                                <td style="padding: 12px; font-family: monospace; font-size: 12px;">{{ log.task_id[:20] + '...' if log.task_id and log.task_id|length > 20 else (log.task_id or '-') }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Пагинация -->
+                {% if pagination.pages > 1 %}
+                <div style="margin-top: 24px; display: flex; justify-content: center; gap: 8px;">
+                    {% if pagination.has_prev %}
+                    <a href="?page={{ pagination.prev_num }}&action={{ action_filter }}&username={{ username_filter }}&date_from={{ date_from }}&date_to={{ date_to }}" class="btn btn-primary">← Назад</a>
+                    {% endif %}
+                    <span style="padding: 8px 16px; display: flex; align-items: center;">Страница {{ pagination.page }} из {{ pagination.pages }}</span>
+                    {% if pagination.has_next %}
+                    <a href="?page={{ pagination.next_num }}&action={{ action_filter }}&username={{ username_filter }}&date_from={{ date_from }}&date_to={{ date_to }}" class="btn btn-primary">Вперед →</a>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </main>
+</body>
+</html>
