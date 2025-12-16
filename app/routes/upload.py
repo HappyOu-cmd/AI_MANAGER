@@ -48,13 +48,13 @@ def upload_file():
     
     current_app.logger.info(f"📥 Получен запрос /upload от пользователя {current_user.username}")
     
-        if 'file' not in request.files:
+    if 'file' not in request.files:
         current_app.logger.warning("❌ Файл не найден в запросе")
         return jsonify({'error': 'Файл не выбран'}), 400
-        
-        file = request.files['file']
-        
-        if file.filename == '':
+    
+    file = request.files['file']
+    
+    if file.filename == '':
         current_app.logger.warning("❌ Имя файла пустое")
         return jsonify({'error': 'Файл не выбран'}), 400
     
