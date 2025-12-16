@@ -123,17 +123,17 @@ def _create_directories(app):
 def _setup_logging(app):
     """Настраивает систему логирования"""
     # Всегда логируем в файл (и в debug, и в production)
-        log_file = Path(app.config['LOG_FOLDER']) / 'app.log'
-        file_handler = RotatingFileHandler(
-            log_file,
-            maxBytes=10240000,  # 10MB
-            backupCount=10
-        )
-        file_handler.setFormatter(logging.Formatter(
-            '%(asctime)s [%(levelname)s] [%(name)s] %(message)s [in %(pathname)s:%(lineno)d]'
-        ))
-        file_handler.setLevel(logging.INFO)
-        app.logger.addHandler(file_handler)
+    log_file = Path(app.config['LOG_FOLDER']) / 'app.log'
+    file_handler = RotatingFileHandler(
+        log_file,
+        maxBytes=10240000,  # 10MB
+        backupCount=10
+    )
+    file_handler.setFormatter(logging.Formatter(
+        '%(asctime)s [%(levelname)s] [%(name)s] %(message)s [in %(pathname)s:%(lineno)d]'
+    ))
+    file_handler.setLevel(logging.INFO)
+    app.logger.addHandler(file_handler)
     
     # Настраиваем логирование для модулей
     logging.basicConfig(
