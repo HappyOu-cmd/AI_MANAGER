@@ -100,26 +100,63 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Восстановление прогресса при загрузке страницы
-    function restoreProgress() {
+    async function restoreProgress() {
         const savedTaskId = localStorage.getItem('currentTaskId');
         if (savedTaskId) {
-            console.log('🔄 Восстановление прогресса для task_id:', savedTaskId);
+            console.log('🔄 Проверка сохраненной задачи:', savedTaskId);
             currentTaskId = savedTaskId;
             
-            // Показываем UI обработки
-            submitBtn.disabled = true;
-            loader.style.display = 'inline';
-            document.querySelector('.btn-text').textContent = 'Обработка...';
-            progressSteps.style.display = 'block';
-            
-            // Показываем кнопку остановки
-            const cancelBtn = document.getElementById('cancelBtn');
-            if (cancelBtn) {
-                cancelBtn.style.display = 'inline-block';
+            // Проверяем статус задачи на сервере
+            try {
+                const response = await fetch(`/api/status/${savedTaskId}`);
+                if (response.ok) {
+                    const status = await response.json();
+                    console.log('✅ Задача найдена, статус:', status.status);
+                    
+                    // Если задача завершена, отменена или с ошибкой, очищаем
+                    if (status.status === 'completed' || status.status === 'error' || status.status === 'cancelled') {
+                        console.log('ℹ️ Задача уже завершена, очищаем localStorage');
+                        localStorage.removeItem('currentTaskId');
+                        localStorage.removeItem('taskStartTime');
+                        currentTaskId = null;
+                        return;
+                    }
+                    
+                    // Если задача активна, показываем UI и запускаем polling
+                    console.log('🔄 Восстановление прогресса для активной задачи');
+                    submitBtn.disabled = true;
+                    loader.style.display = 'inline';
+                    document.querySelector('.btn-text').textContent = 'Обработка...';
+                    progressSteps.style.display = 'block';
+                    
+                    // Показываем кнопку остановки
+                    const cancelBtn = document.getElementById('cancelBtn');
+                    if (cancelBtn) {
+                        cancelBtn.style.display = 'inline-block';
+                    }
+                    
+                    // Запускаем polling для восстановления статуса
+                    startStatusPolling(savedTaskId);
+                } else if (response.status === 404) {
+                    // Задача не найдена - очищаем localStorage
+                    console.log('ℹ️ Задача не найдена на сервере, очищаем localStorage');
+                    localStorage.removeItem('currentTaskId');
+                    localStorage.removeItem('taskStartTime');
+                    currentTaskId = null;
+                } else {
+                    console.warn('⚠️ Ошибка проверки статуса:', response.status);
+                    // При ошибке тоже очищаем, чтобы не показывать ложный прогресс
+                    localStorage.removeItem('currentTaskId');
+                    localStorage.removeItem('taskStartTime');
+                    currentTaskId = null;
+                }
+            } catch (error) {
+                console.warn('⚠️ Ошибка при проверке статуса задачи:', error);
+                // При ошибке очищаем localStorage
+                localStorage.removeItem('currentTaskId');
+                localStorage.removeItem('taskStartTime');
+                currentTaskId = null;
             }
-            
-            // Запускаем polling для восстановления статуса
-            startStatusPolling(savedTaskId);
         }
     }
     
