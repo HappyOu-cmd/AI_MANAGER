@@ -110,8 +110,11 @@ class OpenAIClient:
                 "  pip install openai"
             )
         
-        # Настройка клиента
-        client = openai.OpenAI(api_key=self.api_key)
+        # Настройка клиента с увеличенным таймаутом для больших промптов
+        # Таймаут 30 минут (1800 секунд) для обработки больших документов
+        import httpx
+        http_client = httpx.Client(timeout=1800.0)
+        client = openai.OpenAI(api_key=self.api_key, http_client=http_client)
         
         # Сохраняем промпт для отладки (если нужно)
         if save_prompt:
