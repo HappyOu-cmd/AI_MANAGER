@@ -153,15 +153,21 @@ def _create_default_admin(app):
     """Создает администратора по умолчанию если его нет"""
     from app.models.user import User
     
-    admin = User.query.filter_by(username='admin').first()
-    if not admin:
-        admin = User(
-            username='admin',
-            email='admin@example.com',
-            is_admin=True
-        )
-        admin.set_password('admin')  # Сменить при первом входе!
-        db.session.add(admin)
-        db.session.commit()
-        app.logger.info('✅ Создан администратор по умолчанию: admin/admin')
+    try:
+        admin = User.query.filter_by(username='admin').first()
+        if not admin:
+            admin = User(
+                username='admin',
+                email='admin@example.com',
+                is_admin=True
+            )
+            admin.set_password('admin')  # Сменить при первом входе!
+            db.session.add(admin)
+            db.session.commit()
+            app.logger.info('✅ Создан администратор по умолчанию: admin/admin')
+        else:
+            app.logger.info('ℹ️  Администратор уже существует')
+    except Exception as e:
+        db.session.rollback()
+        app.logger.warning(f'⚠️  Ошибка при создании администратора: {e}')
 
