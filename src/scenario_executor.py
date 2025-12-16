@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 class ScenarioExecutor:
     """Выполняет сценарий обработки ТЗ"""
     
-    def __init__(self, scenario: Dict, status_manager=None, task_id: str = None):
+    def __init__(self, scenario: Dict, status_manager=None, task_id: str = None, results_folder: str = None):
         """
         Инициализация исполнителя
         
@@ -35,9 +35,11 @@ class ScenarioExecutor:
             scenario: Словарь с конфигурацией сценария
             status_manager: Менеджер статусов для отслеживания прогресса (опционально)
             task_id: ID задачи для отслеживания статуса (опционально)
+            results_folder: Путь к папке для сохранения результатов (опционально)
         """
         self.scenario = scenario
         self.project_root = Path(__file__).parent.parent
+        self.results_folder = Path(results_folder) if results_folder else (self.project_root / "results")
         self.results = {}
         self.errors = []
         self.status_manager = status_manager
@@ -182,10 +184,10 @@ class ScenarioExecutor:
                 # Если Excel еще не создан, используем имя файла из основного результата или создаем новое
                 if not excel_path:
                     if excel_filename:
-                        excel_path = str(self.project_root / "results" / excel_filename)
+                        excel_path = str(self.results_folder / excel_filename)
                     else:
                         excel_filename = f"{output_prefix}_filled.xlsx"
-                        excel_path = str(self.project_root / "results" / excel_filename)
+                        excel_path = str(self.results_folder / excel_filename)
                 
                 result = self._process_additional_prompt(
                     prompt_type, converted_text, ai_client, output_prefix, excel_path
@@ -261,7 +263,7 @@ class ScenarioExecutor:
             logger.info(f"[{self.task_id}] 💾 Сохранение JSON результата...")
             # Сохраняем JSON
             json_filename = f"{output_prefix}_filled.json"
-            json_path = self.project_root / "results" / json_filename
+            json_path = self.results_folder / json_filename
             json_path.parent.mkdir(parents=True, exist_ok=True)
             
             with open(json_path, 'w', encoding='utf-8') as f:
@@ -271,7 +273,7 @@ class ScenarioExecutor:
             # Конвертируем в Excel
             logger.info(f"[{self.task_id}] 📊 Конвертация в Excel...")
             excel_filename = f"{output_prefix}_filled.xlsx"
-            excel_path = self.project_root / "results" / excel_filename
+            excel_path = self.results_folder / excel_filename
             
             try:
                 excel_converter = JSONToExcelConverter()
@@ -351,7 +353,7 @@ class ScenarioExecutor:
                 logger.info(f"[{self.task_id}] 📊 Создание нового Excel файла...")
                 from openpyxl import Workbook
                 excel_filename = f"{output_prefix}_filled.xlsx"
-                excel_path = self.project_root / "results" / excel_filename
+                excel_path = self.results_folder / excel_filename
                 excel_path.parent.mkdir(parents=True, exist_ok=True)
                 
                 wb = Workbook()

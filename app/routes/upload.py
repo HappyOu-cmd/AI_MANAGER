@@ -144,7 +144,13 @@ def upload_file():
             processing_start_time = datetime.utcnow()
             
             current_app.logger.info(f"[{task_id}] 🚀 Начало выполнения сценария '{scenario_id}' (AI: {ai_provider})")
-            executor = ScenarioExecutor(scenario, status_manager=status_manager, task_id=task_id)
+            results_folder = str(Path(current_app.config['RESULTS_FOLDER']))
+            executor = ScenarioExecutor(
+                scenario, 
+                status_manager=status_manager, 
+                task_id=task_id,
+                results_folder=results_folder
+            )
             # Используем task_id в output_prefix для уникальности при параллельной обработке
             output_prefix = f"{task_id}_{Path(safe_filename).stem}"
             result = executor.execute(
