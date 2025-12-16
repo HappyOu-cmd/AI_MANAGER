@@ -67,17 +67,33 @@ def download_result(filename):
         file_to_download = filename
     
     # Пробуем найти файл по имени из БД
+    # Проверяем в новой директории (storage/results)
     file_path = Path(current_app.config['RESULTS_FOLDER']) / file_to_download
+    
+    # Если не найден, проверяем в старой директории (results)
+    if not file_path.exists():
+        old_results_dir = Path(current_app.config['BASE_DIR']) / "results"
+        old_file_path = old_results_dir / file_to_download
+        if old_file_path.exists():
+            file_path = old_file_path
+            current_app.logger.info(f"ℹ️ Файл найден в старой директории: {old_file_path}")
     
     # Если не найден, пробуем разные варианты имени
     if not file_path.exists():
-        # Вариант 1: secure_filename
+        # Вариант 1: secure_filename в новой директории
         safe_filename = secure_filename(file_to_download)
         file_path = Path(current_app.config['RESULTS_FOLDER']) / safe_filename
         
-        # Вариант 2: Поиск по task_id (если имя содержит task_id)
+        # Вариант 2: secure_filename в старой директории
+        if not file_path.exists():
+            old_results_dir = Path(current_app.config['BASE_DIR']) / "results"
+            old_file_path = old_results_dir / safe_filename
+            if old_file_path.exists():
+                file_path = old_file_path
+                current_app.logger.info(f"ℹ️ Файл найден в старой директории (safe): {old_file_path}")
+        
+        # Вариант 3: Поиск по task_id в новой директории
         if not file_path.exists() and doc.task_id:
-            import os
             results_dir = Path(current_app.config['RESULTS_FOLDER'])
             # Ищем все файлы, начинающиеся с task_id
             for file in results_dir.glob(f"{doc.task_id}*"):
@@ -87,6 +103,20 @@ def download_result(filename):
                 elif file.name.endswith('.xlsx') and doc.excel_file and '.xlsx' in doc.excel_file:
                     file_path = file
                     break
+        
+        # Вариант 4: Поиск по task_id в старой директории
+        if not file_path.exists() and doc.task_id:
+            old_results_dir = Path(current_app.config['BASE_DIR']) / "results"
+            if old_results_dir.exists():
+                for file in old_results_dir.glob(f"{doc.task_id}*"):
+                    if file.name.endswith('.json') and doc.json_file and '.json' in doc.json_file:
+                        file_path = file
+                        current_app.logger.info(f"ℹ️ Файл найден в старой директории по task_id: {file_path}")
+                        break
+                    elif file.name.endswith('.xlsx') and doc.excel_file and '.xlsx' in doc.excel_file:
+                        file_path = file
+                        current_app.logger.info(f"ℹ️ Файл найден в старой директории по task_id: {file_path}")
+                        break
     
     if not file_path.exists():
         current_app.logger.error(f"❌ Файл не найден на диске: {file_to_download} (проверено: {file_path})")
