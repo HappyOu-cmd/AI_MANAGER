@@ -76,8 +76,10 @@ def upload_file():
             current_app.logger.info(f"📋 Создан новый Task ID: {task_id}")
         
         status_manager = ProcessingStatus()
-        status_manager.create_status(task_id)
-        current_app.logger.info(f"✅ Статус создан для task_id: {task_id}")
+        status = status_manager.create_status(task_id)
+        # Сохраняем user_id в статусе для проверки прав доступа
+        status_manager.update_status(task_id, user_id=current_user.id)
+        current_app.logger.info(f"✅ Статус создан для task_id: {task_id} (пользователь: {current_user.username})")
         
         try:
             # Шаг 1: Сохраняем загруженный файл
@@ -100,7 +102,7 @@ def upload_file():
             upload_path = Path(current_app.config['UPLOAD_FOLDER']) / filename
             file.save(str(upload_path))
             current_app.logger.info(f"✅ Файл сохранен: {upload_path}")
-        
+            
             # Шаг 2: Конвертируем документ в текст
             current_app.logger.info("🔄 Шаг 2: Конвертация документа...")
             status_manager.update_status(task_id, stage='conversion', message='Конвертация документа в текст...')
@@ -250,13 +252,12 @@ def upload_file():
             
             # Дополнительные результаты (CSV → Excel листы)
             sheet_names_map = {
-                'instrument': 'Инструмент',
-                'tooling': 'Оснастка',
+                'instrument_tooling': 'Инструмент+Оснастка',
                 'services': 'Услуги',
                 'spare_parts': 'ЗИП'
             }
             
-            for result_type in ['instrument', 'tooling', 'services', 'spare_parts']:
+            for result_type in ['instrument_tooling', 'services', 'spare_parts']:
                 if result_type in result['results']:
                     sheet_result = result['results'][result_type]
                     if sheet_result.get('sheet_added'):
@@ -362,32 +363,49 @@ def api_cancel_task(task_id):
     """API: Остановить обработку задачи"""
     current_app.logger.info(f"🛑 Запрос на остановку задачи: {task_id} от пользователя {current_user.username}")
     
-    # Проверяем, что задача принадлежит пользователю
-    doc = Document.query.filter_by(task_id=task_id, user_id=current_user.id).first()
-    if not doc:
+    status_manager = ProcessingStatus()
+    
+    # Проверяем статус задачи
+    status = status_manager.get_status(task_id)
+    if not status:
+        current_app.logger.warning(f"⚠️ Задача {task_id} не найдена в статусах")
         return jsonify({
             'success': False,
-            'error': 'Задача не найдена или у вас нет прав на её отмену',
+            'error': 'Задача не найдена',
             'task_id': task_id
         }), 404
     
-    status_manager = ProcessingStatus()
+    # Проверяем, что задача принадлежит пользователю (если есть user_id в статусе)
+    if status.get('user_id') and status.get('user_id') != current_user.id:
+        current_app.logger.warning(f"⚠️ Попытка отменить чужую задачу: пользователь {current_user.username} пытается отменить задачу пользователя {status.get('user_id')}")
+        return jsonify({
+            'success': False,
+            'error': 'У вас нет прав на отмену этой задачи',
+            'task_id': task_id
+        }), 403
+    
+    # Отменяем задачу
     success = status_manager.cancel_task(task_id)
     
     if success:
-        # Обновляем статус в БД
-        doc.status = 'cancelled'
-        db.session.commit()
+        # Обновляем статус в БД, если документ уже создан
+        doc = Document.query.filter_by(task_id=task_id, user_id=current_user.id).first()
+        if doc:
+            doc.status = 'cancelled'
+            db.session.commit()
         
         # Логируем отмену
-        log_activity(
-            user_id=current_user.id,
-            username=current_user.username,
-            ip_address=request.remote_addr,
-            action='upload_cancelled',
-            details=f'Обработка отменена пользователем',
-            task_id=task_id
-        )
+        try:
+            log_activity(
+                user_id=current_user.id,
+                username=current_user.username,
+                ip_address=request.remote_addr,
+                action='upload_cancelled',
+                details=f'Обработка отменена пользователем',
+                task_id=task_id
+            )
+        except Exception as e:
+            current_app.logger.warning(f"⚠️ Ошибка логирования отмены: {e}")
         
         current_app.logger.info(f"✅ Задача {task_id} успешно отменена")
         return jsonify({
@@ -396,12 +414,20 @@ def api_cancel_task(task_id):
             'task_id': task_id
         })
     else:
-        current_app.logger.warning(f"⚠️ Не удалось отменить задачу: {task_id}")
+        current_app.logger.warning(f"⚠️ Не удалось отменить задачу: {task_id} (возможно, уже завершена)")
+        # Даже если не удалось отменить через статус, возвращаем успех если задача уже завершена
+        if status.get('status') in ['completed', 'error', 'cancelled']:
+            return jsonify({
+                'success': True,
+                'message': 'Задача уже завершена',
+                'task_id': task_id,
+                'status': status.get('status')
+            })
         return jsonify({
             'success': False,
-            'error': 'Задача не найдена или уже завершена',
+            'error': 'Не удалось отменить задачу',
             'task_id': task_id
-        }), 404
+        }), 500
 
 
 def log_activity(user_id=None, username=None, ip_address=None, action='', details='', task_id=None):

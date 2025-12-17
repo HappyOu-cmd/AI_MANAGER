@@ -12,13 +12,9 @@
       "tz_template": "data/TZ.json",
       "glossary": "data/glossary.json"
     },
-    "instrument": {
+    "instrument_tooling": {
       "enabled": true,
-      "file": "data/prompts/токарный/инструмент.txt"
-    },
-    "tooling": {
-      "enabled": true,
-      "file": "data/prompts/токарный/оснастка.txt"
+      "file": "data/prompts/токарный/инструмент_оснастка.txt"
     },
     "services": {
       "enabled": true,

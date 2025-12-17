@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 import sys
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 
 # Добавляем src в путь
 sys.path.insert(0, str(Path(__file__).parent))
@@ -71,7 +73,8 @@ class ScenarioExecutor:
         total_steps = 0
         if self.scenario['prompts']['main'].get('enabled'):
             total_steps += 1
-        additional_types = ['instrument', 'tooling', 'services', 'spare_parts']
+        # Объединенный промпт для инструмента и оснастки
+        additional_types = ['instrument_tooling', 'services', 'spare_parts']
         for prompt_type in additional_types:
             if self.scenario['prompts'][prompt_type].get('enabled'):
                 total_steps += 1
@@ -153,50 +156,95 @@ class ScenarioExecutor:
         
         # Обрабатываем дополнительные промпты (добавляем в тот же Excel)
         step_names = {
-            'instrument': 'Извлечение инструмента',
-            'tooling': 'Извлечение оснастки',
+            'instrument_tooling': 'Извлечение инструмента и оснастки',
             'services': 'Извлечение услуг',
             'spare_parts': 'Извлечение ЗИП'
         }
         
+        # Параллельная обработка дополнительных промптов
+        # Создаем список задач для параллельного выполнения
+        parallel_tasks = []
         for prompt_type in additional_types:
             if self.scenario['prompts'][prompt_type].get('enabled'):
-                # Проверяем отмену перед каждым промптом
-                if self.status_manager and self.task_id and self.status_manager.is_cancelled(self.task_id):
-                    logger.info(f"[{self.task_id}] ⛔ Задача отменена перед обработкой промпта {prompt_type}")
-                    return {
-                        'success': False,
-                        'results': self.results,
-                        'errors': self.errors + ['Задача отменена пользователем']
-                    }
-                
-                current_step += 1
-                logger.info(f"[{self.task_id}] 📝 Начало обработки промпта {prompt_type} (шаг {current_step}/{total_steps})")
-                if self.status_manager and self.task_id:
-                    self.status_manager.update_status(
-                        self.task_id,
-                        current_step=current_step,
-                        stage=f'{prompt_type}_prompt',
-                        message=f'{step_names.get(prompt_type, prompt_type)}...',
-                        progress=int((current_step / total_steps) * 100) if total_steps > 0 else 0
+                parallel_tasks.append(prompt_type)
+        
+        # Если есть задачи для параллельной обработки
+        if parallel_tasks:
+            logger.info(f"[{self.task_id}] 🚀 Запуск параллельной обработки {len(parallel_tasks)} промптов: {', '.join(parallel_tasks)}")
+            
+            # Создаем блокировку для записи в Excel
+            excel_lock = threading.Lock()
+            
+            def process_prompt_parallel(prompt_type: str):
+                """Обработка одного промпта в параллельном потоке"""
+                try:
+                    # Проверяем отмену перед обработкой
+                    if self.status_manager and self.task_id and self.status_manager.is_cancelled(self.task_id):
+                        logger.info(f"[{self.task_id}] ⛔ Задача отменена перед обработкой промпта {prompt_type}")
+                        return None
+                    
+                    # Для параллельных промптов шаг = основной + 1 (все параллельные на одном шаге)
+                    current_step = 2 if self.scenario['prompts']['main'].get('enabled') else 1
+                    total_steps_for_progress = 2  # основной + параллельные (считаем как один шаг)
+                    
+                    logger.info(f"[{self.task_id}] 📝 Начало обработки промпта {prompt_type} (параллельно)")
+                    if self.status_manager and self.task_id:
+                        self.status_manager.update_status(
+                            self.task_id,
+                            current_step=current_step,
+                            stage=f'{prompt_type}_prompt',
+                            message=f'{step_names.get(prompt_type, prompt_type)}...',
+                            progress=int((current_step / total_steps_for_progress) * 100) if total_steps_for_progress > 0 else 0
+                        )
+                    
+                    # Если Excel еще не создан, используем имя файла из основного результата или создаем новое
+                    local_excel_path = excel_path
+                    if not local_excel_path:
+                        if excel_filename:
+                            local_excel_path = str(self.results_folder / excel_filename)
+                        else:
+                            local_excel_filename = f"{output_prefix}_filled.xlsx"
+                            local_excel_path = str(self.results_folder / local_excel_filename)
+                    
+                    # Обрабатываем промпт
+                    result = self._process_additional_prompt(
+                        prompt_type, converted_text, ai_client, output_prefix, local_excel_path, excel_lock
                     )
-                
-                # Если Excel еще не создан, используем имя файла из основного результата или создаем новое
-                if not excel_path:
-                    if excel_filename:
-                        excel_path = str(self.results_folder / excel_filename)
+                    
+                    if result:
+                        logger.info(f"[{self.task_id}] ✅ Промпт {prompt_type} обработан успешно")
+                        return (prompt_type, result)
                     else:
-                        excel_filename = f"{output_prefix}_filled.xlsx"
-                        excel_path = str(self.results_folder / excel_filename)
+                        logger.warning(f"[{self.task_id}] ⚠️ Промпт {prompt_type} не вернул результат")
+                        return None
+                except Exception as e:
+                    logger.error(f"[{self.task_id}] ❌ Ошибка при параллельной обработке {prompt_type}: {e}")
+                    self.errors.append(f"Ошибка обработки промпта {prompt_type}: {str(e)}")
+                    return None
+            
+            # Запускаем параллельную обработку
+            with ThreadPoolExecutor(max_workers=len(parallel_tasks)) as executor:
+                # Отправляем все задачи
+                future_to_prompt = {executor.submit(process_prompt_parallel, prompt_type): prompt_type 
+                                    for prompt_type in parallel_tasks}
                 
-                result = self._process_additional_prompt(
-                    prompt_type, converted_text, ai_client, output_prefix, excel_path
-                )
-                if result:
-                    self.results[prompt_type] = result
-                    # Обновляем размер Excel файла в основном результате
-                    if 'main' in self.results and excel_path and Path(excel_path).exists():
-                        self.results['main']['excel_size'] = Path(excel_path).stat().st_size
+                # Собираем результаты по мере выполнения
+                for future in as_completed(future_to_prompt):
+                    prompt_type = future_to_prompt[future]
+                    try:
+                        result = future.result()
+                        if result:
+                            result_prompt_type, result_data = result
+                            self.results[result_prompt_type] = result_data
+                            # Обновляем размер Excel файла в основном результате
+                            if 'main' in self.results and excel_path and Path(excel_path).exists():
+                                with excel_lock:
+                                    self.results['main']['excel_size'] = Path(excel_path).stat().st_size
+                    except Exception as e:
+                        logger.error(f"[{self.task_id}] ❌ Исключение при обработке {prompt_type}: {e}")
+                        self.errors.append(f"Ошибка обработки промпта {prompt_type}: {str(e)}")
+            
+            logger.info(f"[{self.task_id}] ✅ Параллельная обработка завершена. Обработано: {len(self.results)} промптов")
         
         # Финальный статус
         if self.status_manager and self.task_id:
@@ -301,7 +349,8 @@ class ScenarioExecutor:
             return None
     
     def _process_additional_prompt(self, prompt_type: str, converted_text: str, 
-                                   ai_client, output_prefix: str, excel_path: Optional[str] = None) -> Optional[Dict]:
+                                   ai_client, output_prefix: str, excel_path: Optional[str] = None,
+                                   excel_lock: Optional[threading.Lock] = None) -> Optional[Dict]:
         """Обрабатывает дополнительный промпт (CSV → Excel лист)"""
         try:
             logger.info(f"[{self.task_id}] 📋 Чтение конфигурации промпта {prompt_type}")
@@ -377,20 +426,27 @@ class ScenarioExecutor:
             
             # Имена листов
             sheet_names = {
-                'instrument': 'Инструмент',
-                'tooling': 'Оснастка',
+                'instrument_tooling': 'Инструмент+Оснастка',
                 'services': 'Услуги',
                 'spare_parts': 'ЗИП'
             }
             
-            # Добавляем лист в Excel
+            # Добавляем лист в Excel (с блокировкой для потокобезопасности)
             logger.info(f"[{self.task_id}] 📊 Добавление листа '{sheet_names.get(prompt_type, prompt_type)}' в Excel...")
             try:
-                csv_appender.add_csv_sheet(
-                    excel_path,
-                    csv_text,
-                    sheet_names.get(prompt_type, prompt_type)
-                )
+                if excel_lock:
+                    with excel_lock:
+                        csv_appender.add_csv_sheet(
+                            excel_path,
+                            csv_text,
+                            sheet_names.get(prompt_type, prompt_type)
+                        )
+                else:
+                    csv_appender.add_csv_sheet(
+                        excel_path,
+                        csv_text,
+                        sheet_names.get(prompt_type, prompt_type)
+                    )
                 sheet_added = True
                 logger.info(f"[{self.task_id}] ✅ Лист '{sheet_names.get(prompt_type, prompt_type)}' успешно добавлен")
             except Exception as e:

@@ -66,6 +66,12 @@ def create_app(config_class=Config):
         from app.models.user import User
         return User.query.get(int(user_id))
     
+    # Добавляем current_user в контекст шаблонов (на случай если Flask-Login не делает это автоматически)
+    @app.context_processor
+    def inject_user():
+        from flask_login import current_user
+        return dict(current_user=current_user)
+    
     # Настраиваем логирование
     _setup_logging(app)
     

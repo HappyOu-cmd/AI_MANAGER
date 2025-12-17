@@ -209,8 +209,14 @@ class CSVToExcelAppender:
                                                    for obj in objects) for k in all_keys):
                 has_service_keywords = True
         
+        # Для объединенного промпта инструмент+оснастка проверяем наличие типа и инструмента/оснастки
         has_tooling_keywords = any('тип' in k.lower() or 'type' in k.lower() for k in all_keys) and \
-                              any('диапазон' in k.lower() or 'зажима' in k.lower() for k in all_keys)
+                              (any('диапазон' in k.lower() or 'зажима' in k.lower() for k in all_keys) or
+                               any('инструмент' in str(obj.get('type', '')).lower() or 
+                                   'оснастка' in str(obj.get('type', '')).lower() or
+                                   'патрон' in str(obj.get('type', '')).lower() or
+                                   'люнет' in str(obj.get('type', '')).lower()
+                                   for obj in objects))
         
         has_spare_parts_keywords = any('категория' in k.lower() or 'category' in k.lower() for k in all_keys)
         if not has_spare_parts_keywords:

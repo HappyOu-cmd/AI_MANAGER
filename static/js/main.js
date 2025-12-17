@@ -514,8 +514,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const stageMap = {
             'conversion': 'conversion',
             'main_prompt': 'main',
-            'instrument_prompt': 'instrument',
-            'tooling_prompt': 'tooling',
+            'instrument_tooling_prompt': 'instrument_tooling',
             'services_prompt': 'services',
             'spare_parts_prompt': 'spare_parts'
         };
@@ -603,7 +602,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function resetProgressSteps() {
-        const stepIds = ['conversion', 'main', 'instrument', 'tooling', 'services', 'spare_parts'];
+        const stepIds = ['conversion', 'main', 'instrument_tooling', 'services', 'spare_parts'];
         stepIds.forEach(stepId => {
             const step = document.getElementById(`step_${stepId}`);
             if (step) {
@@ -623,8 +622,26 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Отмечаем предыдущие шаги как завершенные
-        const stepOrder = ['conversion', 'main', 'instrument', 'tooling', 'services', 'spare_parts'];
+        const stepOrder = ['conversion', 'main', 'instrument_tooling', 'services', 'spare_parts'];
         const currentIndex = stepOrder.indexOf(stepId);
+        
+        // Для параллельных шагов (instrument_tooling, services, spare_parts) показываем их все одновременно
+        if (stepId === 'instrument_tooling' || stepId === 'services' || stepId === 'spare_parts') {
+            // Показываем все параллельные шаги
+            const parallelSteps = ['instrument_tooling', 'services', 'spare_parts'];
+            parallelSteps.forEach(parallelStepId => {
+                const parallelStep = document.getElementById(`step_${parallelStepId}`);
+                if (parallelStep) {
+                    parallelStep.style.display = 'block';
+                    parallelStep.classList.add('active');
+                }
+            });
+            // Показываем информацию о параллельной обработке
+            const parallelInfo = document.querySelector('.step-parallel-info');
+            if (parallelInfo) {
+                parallelInfo.style.display = 'block';
+            }
+        }
         
         for (let i = 0; i < currentIndex; i++) {
             const prevStep = document.getElementById(`step_${stepOrder[i]}`);
@@ -644,7 +661,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function completeAllProgressSteps() {
-        const stepIds = ['conversion', 'main', 'instrument', 'tooling', 'services', 'spare_parts'];
+        const stepIds = ['conversion', 'main', 'instrument_tooling', 'services', 'spare_parts'];
         stepIds.forEach(stepId => {
             const step = document.getElementById(`step_${stepId}`);
             if (step && step.style.display !== 'none') {
@@ -652,6 +669,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 step.classList.add('completed');
             }
         });
+        // Скрываем информацию о параллельной обработке
+        const parallelInfo = document.querySelector('.step-parallel-info');
+        if (parallelInfo) {
+            parallelInfo.style.display = 'none';
+        }
     }
     
     async function loadScenarioSteps(scenarioId) {
@@ -663,8 +685,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Показываем/скрываем шаги на основе включенных промптов
                 const stepMap = {
                     'main': 'main',
-                    'instrument': 'instrument',
-                    'tooling': 'tooling',
+                    'instrument_tooling': 'instrument_tooling',
                     'services': 'services',
                     'spare_parts': 'spare_parts'
                 };
@@ -685,11 +706,20 @@ document.addEventListener('DOMContentLoaded', function() {
                         step.style.display = isEnabled ? 'block' : 'none';
                     }
                 }
+                
+                // Показываем информацию о параллельной обработке если есть хотя бы один дополнительный промпт
+                const hasParallelPrompts = (scenario.prompts?.instrument_tooling?.enabled) ||
+                                         (scenario.prompts?.services?.enabled) ||
+                                         (scenario.prompts?.spare_parts?.enabled);
+                const parallelInfo = document.querySelector('.step-parallel-info');
+                if (parallelInfo && hasParallelPrompts) {
+                    parallelInfo.style.display = 'block';
+                }
             }
         } catch (error) {
             console.warn('Не удалось загрузить информацию о сценарии:', error);
             // В случае ошибки показываем все шаги
-            const stepIds = ['conversion', 'main', 'instrument', 'tooling', 'services', 'spare_parts'];
+            const stepIds = ['conversion', 'main', 'instrument_tooling', 'services', 'spare_parts'];
             stepIds.forEach(stepId => {
                 const step = document.getElementById(`step_${stepId}`);
                 if (step) {
