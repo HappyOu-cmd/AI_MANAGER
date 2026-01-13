@@ -8,7 +8,7 @@ from flask_login import login_required, current_user
 from pathlib import Path
 import json
 from app.config import Config
-from app.models.activity_log import ActivityLog, db
+from app.models.db import db
 
 bp = Blueprint('prompts', __name__, url_prefix='/prompts')
 
@@ -123,17 +123,17 @@ def save_prompt():
         
         # Логируем действие
         try:
-            ActivityLog.log_activity(
+            from app.routes.upload import log_activity
+            log_activity(
                 user_id=current_user.id,
                 username=current_user.username,
                 ip_address=request.remote_addr,
                 action='prompt_updated',
                 details=f'Промпт обновлен: {path}'
             )
-            db.session.commit()
         except Exception as e:
-            db.session.rollback()
             # Не прерываем сохранение промпта из-за ошибки логирования
+            pass
         
         return jsonify({
             'success': True,
@@ -177,17 +177,17 @@ def create_prompt():
         
         # Логируем действие
         try:
-            ActivityLog.log_activity(
+            from app.routes.upload import log_activity
+            log_activity(
                 user_id=current_user.id,
                 username=current_user.username,
                 ip_address=request.remote_addr,
                 action='prompt_created',
                 details=f'Промпт создан: {path}'
             )
-            db.session.commit()
         except Exception as e:
-            db.session.rollback()
             # Не прерываем создание промпта из-за ошибки логирования
+            pass
         
         return jsonify({
             'success': True,
@@ -226,17 +226,17 @@ def delete_prompt():
         
         # Логируем действие
         try:
-            ActivityLog.log_activity(
+            from app.routes.upload import log_activity
+            log_activity(
                 user_id=current_user.id,
                 username=current_user.username,
                 ip_address=request.remote_addr,
                 action='prompt_deleted',
                 details=f'Промпт удален: {path}'
             )
-            db.session.commit()
         except Exception as e:
-            db.session.rollback()
             # Не прерываем удаление промпта из-за ошибки логирования
+            pass
         
         return jsonify({
             'success': True,

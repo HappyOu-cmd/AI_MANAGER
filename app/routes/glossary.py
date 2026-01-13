@@ -8,7 +8,7 @@ from flask_login import login_required, current_user
 from pathlib import Path
 import json
 from app.config import Config
-from app.models.activity_log import ActivityLog, db
+from app.models.db import db
 
 bp = Blueprint('glossary', __name__, url_prefix='/glossary')
 
@@ -80,17 +80,17 @@ def save_glossary():
         
         # Логируем действие
         try:
-            ActivityLog.log_activity(
+            from app.routes.upload import log_activity
+            log_activity(
                 user_id=current_user.id,
                 username=current_user.username,
                 ip_address=request.remote_addr,
                 action='glossary_updated',
                 details='Глоссарий обновлен'
             )
-            db.session.commit()
         except Exception as e:
-            db.session.rollback()
             # Не прерываем сохранение глоссария из-за ошибки логирования
+            pass
         
         return jsonify({
             'success': True,
