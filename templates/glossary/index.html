@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
         .editor-container {
-            max-width: 1400px;
+            max-width: 1600px;
             margin: 0 auto;
             padding: 24px;
         }
@@ -16,49 +16,135 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        .search-box {
+            flex: 1;
+            min-width: 300px;
+            position: relative;
+        }
+        .search-input {
+            width: 100%;
+            padding: 12px 16px 12px 44px;
+            border: 1px solid var(--gray-300);
+            border-radius: var(--border-radius);
+            font-size: var(--text-base);
+        }
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary-red);
+            box-shadow: 0 0 0 3px var(--primary-red-lighter);
+        }
+        .search-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-light);
         }
         .editor-actions {
             display: flex;
             gap: 12px;
         }
-        .json-editor {
+        .glossary-table {
             width: 100%;
-            min-height: 600px;
-            font-family: var(--font-mono);
-            font-size: 14px;
+            border-collapse: collapse;
+            background: var(--white);
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+        .glossary-table thead {
+            background: var(--gray-50);
+        }
+        .glossary-table th {
             padding: 16px;
+            text-align: left;
+            font-weight: var(--font-semibold);
+            color: var(--text-dark);
+            border-bottom: 2px solid var(--gray-200);
+        }
+        .glossary-table td {
+            padding: 16px;
+            border-bottom: 1px solid var(--gray-200);
+            vertical-align: top;
+        }
+        .glossary-table tbody tr:hover {
+            background: var(--gray-50);
+        }
+        .glossary-table tbody tr.selected {
+            background: var(--primary-red-lighter);
+        }
+        .path-cell {
+            font-weight: var(--font-medium);
+            color: var(--text-dark);
+            min-width: 300px;
+        }
+        .path-breadcrumb {
+            font-size: var(--text-sm);
+            color: var(--text-light);
+        }
+        .path-name {
+            font-size: var(--text-base);
+            color: var(--text-dark);
+            margin-top: 4px;
+        }
+        .match-cell, .unit-cell {
+            min-width: 250px;
+        }
+        .array-editor {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .array-item {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .array-item input {
+            flex: 1;
+            padding: 8px 12px;
             border: 1px solid var(--gray-300);
             border-radius: var(--border-radius);
-            background: var(--white);
-            resize: vertical;
+            font-size: var(--text-sm);
         }
-        .json-editor:focus {
+        .array-item input:focus {
             outline: none;
             border-color: var(--primary-red);
-            box-shadow: 0 0 0 3px var(--primary-red-lighter);
         }
-        .validation-errors {
-            margin-top: 16px;
-            padding: 16px;
-            background: var(--error-lighter);
-            border-left: 4px solid var(--error);
+        .array-item button {
+            padding: 8px 12px;
+            background: var(--error);
+            color: var(--white);
+            border: none;
             border-radius: var(--border-radius);
-            display: none;
+            cursor: pointer;
+            font-size: var(--text-sm);
+            transition: var(--transition);
         }
-        .validation-errors.show {
-            display: block;
+        .array-item button:hover {
+            background: var(--error-dark);
         }
-        .validation-errors h3 {
-            color: var(--error);
-            margin-bottom: 8px;
+        .add-item-btn {
+            padding: 8px 16px;
+            background: var(--success);
+            color: var(--white);
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: var(--text-sm);
+            transition: var(--transition);
+            align-self: flex-start;
         }
-        .validation-errors ul {
-            margin: 0;
-            padding-left: 20px;
+        .add-item-btn:hover {
+            background: var(--success-dark);
         }
-        .validation-errors li {
-            margin: 4px 0;
-            color: var(--text-dark);
+        .empty-array {
+            color: var(--text-light);
+            font-style: italic;
+            font-size: var(--text-sm);
         }
         .status-message {
             margin-top: 16px;
@@ -78,9 +164,35 @@
             color: var(--text-dark);
             display: block;
         }
+        .no-results {
+            text-align: center;
+            padding: 48px;
+            color: var(--text-light);
+        }
         .loading {
-            opacity: 0.6;
-            pointer-events: none;
+            text-align: center;
+            padding: 48px;
+            color: var(--text-light);
+        }
+        .actions-cell {
+            min-width: 100px;
+        }
+        .save-row-btn {
+            padding: 6px 12px;
+            background: var(--primary-red);
+            color: var(--white);
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: var(--text-sm);
+            transition: var(--transition);
+        }
+        .save-row-btn:hover {
+            background: var(--primary-red-dark);
+        }
+        .save-row-btn:disabled {
+            background: var(--gray-300);
+            cursor: not-allowed;
         }
     </style>
 </head>
@@ -89,41 +201,53 @@
         <div class="editor-header">
             <div>
                 <h1>Редактор глоссария</h1>
-                <p style="color: var(--text-light); margin-top: 8px;">Редактирование JSON-глоссария для извлечения параметров из ТЗ</p>
+                <p style="color: var(--text-light); margin-top: 8px;">Табличный редактор для управления глоссарием</p>
             </div>
             <div class="editor-actions">
-                <button class="btn btn-secondary" onclick="validateGlossary()">
-                    <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;">
-                        <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z" fill="currentColor"/>
-                    </svg>
-                    Проверить
-                </button>
-                <button class="btn btn-primary" onclick="saveGlossary()">
+                <button class="btn btn-primary" onclick="saveAllChanges()">
                     <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;">
                         <path d="M19 12V19H5V12H3V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V12H19ZM13 12.67L15.59 10.09L17 11.5L12 16.5L7 11.5L8.41 10.09L11 12.67V3H13V12.67Z" fill="currentColor"/>
                     </svg>
-                    Сохранить
+                    Сохранить все изменения
                 </button>
             </div>
         </div>
 
-        <div class="card">
-            <textarea id="glossaryEditor" class="json-editor" placeholder="Загрузка глоссария..."></textarea>
-            
-            <div id="validationErrors" class="validation-errors">
-                <h3>Ошибки валидации:</h3>
-                <ul id="errorsList"></ul>
-            </div>
-            
-            <div id="statusMessage" class="status-message"></div>
+        <div class="search-box">
+            <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M15.5 14H14.71L14.43 13.73C15.41 12.59 16 11.11 16 9.5C16 5.91 13.09 3 9.5 3C5.91 3 3 5.91 3 9.5C3 13.09 5.91 16 9.5 16C11.11 16 12.59 15.41 13.73 14.43L14 14.71V15.5L19 20.49L20.49 19L15.5 14ZM9.5 14C7.01 14 5 11.99 5 9.5C5 7.01 7.01 5 9.5 5C11.99 5 14 7.01 14 9.5C14 11.99 11.99 14 9.5 14Z" fill="currentColor"/>
+            </svg>
+            <input type="text" id="searchInput" class="search-input" placeholder="Поиск по глоссарию (например: Рабочая подача по оси X)" oninput="filterGlossary()">
         </div>
+
+        <div class="card" style="overflow-x: auto;">
+            <table class="glossary-table" id="glossaryTable">
+                <thead>
+                    <tr>
+                        <th style="width: 30%;">Путь к параметру</th>
+                        <th style="width: 35%;">Match (синонимы)</th>
+                        <th style="width: 25%;">Unit (единицы измерения)</th>
+                        <th style="width: 10%;">Действия</th>
+                    </tr>
+                </thead>
+                <tbody id="glossaryTableBody">
+                    <tr>
+                        <td colspan="4" class="loading">Загрузка глоссария...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div id="statusMessage" class="status-message"></div>
     </div>
 
     <script src="{{ url_for('static', filename='js/toast.js') }}"></script>
     <script>
         let glossaryData = null;
+        let flatGlossary = [];
+        let changedRows = new Set();
 
-        // Загрузка глоссария при открытии страницы
+        // Загрузка глоссария
         async function loadGlossary() {
             try {
                 const response = await fetch('/glossary/api/get');
@@ -131,7 +255,8 @@
                 
                 if (data.success) {
                     glossaryData = data.glossary;
-                    document.getElementById('glossaryEditor').value = JSON.stringify(glossaryData, null, 2);
+                    flattenGlossary(glossaryData);
+                    renderTable();
                 } else {
                     showError('Ошибка загрузки глоссария: ' + data.error);
                 }
@@ -140,77 +265,255 @@
             }
         }
 
-        // Валидация глоссария
-        async function validateGlossary() {
-            const editor = document.getElementById('glossaryEditor');
-            const errorsDiv = document.getElementById('validationErrors');
-            const errorsList = document.getElementById('errorsList');
-            
-            try {
-                const glossary = JSON.parse(editor.value);
+        // Преобразование вложенной структуры в плоский массив
+        function flattenGlossary(obj, path = [], result = []) {
+            for (const key in obj) {
+                const currentPath = [...path, key];
+                const value = obj[key];
                 
-                const response = await fetch('/glossary/api/validate', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ glossary })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    errorsDiv.classList.remove('show');
-                    if (typeof toast !== 'undefined') {
-                        toast.success('Глоссарий валиден');
+                if (value && typeof value === 'object' && !Array.isArray(value)) {
+                    // Проверяем, является ли это конечным узлом (есть match или unit)
+                    if ('match' in value || 'unit' in value) {
+                        result.push({
+                            path: currentPath,
+                            pathString: currentPath.join(' > '),
+                            match: value.match || null,
+                            unit: value.unit || null,
+                            originalPath: [...currentPath]
+                        });
                     } else {
-                        showStatus('Глоссарий валиден', 'success');
+                        // Промежуточный узел, продолжаем рекурсию
+                        flattenGlossary(value, currentPath, result);
                     }
-                } else {
-                    errorsList.innerHTML = '';
-                    data.errors.forEach(error => {
-                        const li = document.createElement('li');
-                        li.textContent = error;
-                        errorsList.appendChild(li);
-                    });
-                    errorsDiv.classList.add('show');
                 }
-            } catch (error) {
-                errorsList.innerHTML = '';
-                const li = document.createElement('li');
-                li.textContent = 'Ошибка парсинга JSON: ' + error.message;
-                errorsList.appendChild(li);
-                errorsDiv.classList.add('show');
+            }
+            flatGlossary = result;
+        }
+
+        // Рендеринг таблицы
+        function renderTable(filteredData = null) {
+            const tbody = document.getElementById('glossaryTableBody');
+            const data = filteredData || flatGlossary;
+            
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="no-results">Ничего не найдено</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = data.map((item, index) => {
+                const rowId = `row-${index}`;
+                const matchArray = Array.isArray(item.match) ? item.match : (item.match ? [item.match] : []);
+                const unitArray = Array.isArray(item.unit) ? item.unit : (item.unit ? [item.unit] : []);
+                
+                return `
+                    <tr id="${rowId}" data-path="${item.pathString}">
+                        <td class="path-cell">
+                            <div class="path-breadcrumb">${item.path.slice(0, -1).join(' > ')}</div>
+                            <div class="path-name">${item.path[item.path.length - 1]}</div>
+                        </td>
+                        <td class="match-cell">
+                            ${renderArrayEditor(rowId, 'match', matchArray)}
+                        </td>
+                        <td class="unit-cell">
+                            ${renderArrayEditor(rowId, 'unit', unitArray)}
+                        </td>
+                        <td class="actions-cell">
+                            <button class="save-row-btn" onclick="saveRow('${rowId}')" id="save-${rowId}">
+                                Сохранить
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Рендеринг редактора массива
+        function renderArrayEditor(rowId, field, array) {
+            if (array.length === 0) {
+                return `
+                    <div class="array-editor">
+                        <div class="empty-array">Пусто (будет сохранено как null)</div>
+                        <button class="add-item-btn" onclick="addArrayItem('${rowId}', '${field}')">+ Добавить</button>
+                    </div>
+                `;
+            }
+            
+            return `
+                <div class="array-editor">
+                    ${array.map((item, idx) => `
+                        <div class="array-item">
+                            <input type="text" 
+                                   value="${escapeHtml(item)}" 
+                                   data-row="${rowId}" 
+                                   data-field="${field}" 
+                                   data-index="${idx}"
+                                   onchange="markRowChanged('${rowId}')">
+                            <button onclick="removeArrayItem('${rowId}', '${field}', ${idx})">×</button>
+                        </div>
+                    `).join('')}
+                    <button class="add-item-btn" onclick="addArrayItem('${rowId}', '${field}')">+ Добавить</button>
+                </div>
+            `;
+        }
+
+        // Добавление элемента в массив
+        function addArrayItem(rowId, field) {
+            const row = document.getElementById(rowId);
+            const editor = row.querySelector(`.${field}-cell .array-editor`);
+            
+            if (editor.querySelector('.empty-array')) {
+                editor.innerHTML = '';
+            }
+            
+            const newItem = document.createElement('div');
+            newItem.className = 'array-item';
+            newItem.innerHTML = `
+                <input type="text" 
+                       value="" 
+                       data-row="${rowId}" 
+                       data-field="${field}" 
+                       data-index="-1"
+                       onchange="markRowChanged('${rowId}')"
+                       placeholder="Введите значение">
+                <button onclick="removeArrayItem('${rowId}', '${field}', -1)">×</button>
+            `;
+            
+            const addBtn = editor.querySelector('.add-item-btn');
+            editor.insertBefore(newItem, addBtn);
+            newItem.querySelector('input').focus();
+            markRowChanged(rowId);
+        }
+
+        // Удаление элемента из массива
+        function removeArrayItem(rowId, field, index) {
+            const row = document.getElementById(rowId);
+            const editor = row.querySelector(`.${field}-cell .array-editor`);
+            const items = editor.querySelectorAll('.array-item');
+            
+            if (index === -1) {
+                // Удаляем последний добавленный элемент
+                const lastItem = Array.from(items).find(item => item.querySelector('input').dataset.index === '-1');
+                if (lastItem) {
+                    lastItem.remove();
+                }
+            } else {
+                items[index].remove();
+            }
+            
+            // Если элементов не осталось, показываем пустое состояние
+            const remainingItems = editor.querySelectorAll('.array-item');
+            if (remainingItems.length === 0) {
+                editor.innerHTML = `
+                    <div class="empty-array">Пусто (будет сохранено как null)</div>
+                    <button class="add-item-btn" onclick="addArrayItem('${rowId}', '${field}')">+ Добавить</button>
+                `;
+            }
+            
+            markRowChanged(rowId);
+        }
+
+        // Отметка строки как измененной
+        function markRowChanged(rowId) {
+            changedRows.add(rowId);
+            const saveBtn = document.getElementById(`save-${rowId}`);
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.style.background = 'var(--primary-red)';
             }
         }
 
-        // Сохранение глоссария
-        async function saveGlossary() {
-            const editor = document.getElementById('glossaryEditor');
-            const container = document.querySelector('.editor-container');
+        // Сохранение одной строки
+        async function saveRow(rowId) {
+            const row = document.getElementById(rowId);
+            const pathString = row.dataset.path;
+            const path = pathString.split(' > ');
+            
+            // Получаем значения match
+            const matchInputs = row.querySelectorAll('.match-cell input[type="text"]');
+            const matchValues = Array.from(matchInputs)
+                .map(input => input.value.trim())
+                .filter(val => val !== '');
+            const match = matchValues.length > 0 ? matchValues : null;
+            
+            // Получаем значения unit
+            const unitInputs = row.querySelectorAll('.unit-cell input[type="text"]');
+            const unitValues = Array.from(unitInputs)
+                .map(input => input.value.trim())
+                .filter(val => val !== '');
+            const unit = unitValues.length > 0 ? (unitValues.length === 1 ? unitValues[0] : unitValues) : null;
+            
+            // Обновляем данные в глоссарии
+            updateGlossaryValue(path, { match, unit });
+            
+            // Обновляем плоский массив
+            const flatItem = flatGlossary.find(item => item.pathString === pathString);
+            if (flatItem) {
+                flatItem.match = match;
+                flatItem.unit = unit;
+            }
+            
+            // Убираем отметку об изменении
+            changedRows.delete(rowId);
+            const saveBtn = document.getElementById(`save-${rowId}`);
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.style.background = 'var(--gray-300)';
+            }
+            
+            if (typeof toast !== 'undefined') {
+                toast.success('Строка сохранена локально. Нажмите "Сохранить все изменения" для применения.');
+            }
+        }
+
+        // Обновление значения в глоссарии по пути
+        function updateGlossaryValue(path, value) {
+            let current = glossaryData;
+            for (let i = 0; i < path.length - 1; i++) {
+                if (!current[path[i]]) {
+                    current[path[i]] = {};
+                }
+                current = current[path[i]];
+            }
+            const key = path[path.length - 1];
+            if (!current[key]) {
+                current[key] = {};
+            }
+            current[key].match = value.match;
+            current[key].unit = value.unit;
+        }
+
+        // Сохранение всех изменений
+        async function saveAllChanges() {
+            if (changedRows.size > 0) {
+                if (!confirm(`У вас есть ${changedRows.size} несохраненных изменений. Сохранить все?`)) {
+                    return;
+                }
+            }
             
             try {
-                const glossary = JSON.parse(editor.value);
-                container.classList.add('loading');
-                
                 const response = await fetch('/glossary/api/save', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ glossary })
+                    body: JSON.stringify({ glossary: glossaryData })
                 });
                 
                 const data = await response.json();
-                container.classList.remove('loading');
                 
                 if (data.success) {
+                    changedRows.clear();
+                    // Обновляем кнопки сохранения
+                    document.querySelectorAll('.save-row-btn').forEach(btn => {
+                        btn.disabled = true;
+                        btn.style.background = 'var(--gray-300)';
+                    });
+                    
                     if (typeof toast !== 'undefined') {
                         toast.success('Глоссарий успешно сохранен');
                     } else {
                         showStatus('Глоссарий успешно сохранен', 'success');
                     }
-                    glossaryData = glossary;
                 } else {
                     if (typeof toast !== 'undefined') {
                         toast.error('Ошибка сохранения: ' + data.error);
@@ -219,13 +522,46 @@
                     }
                 }
             } catch (error) {
-                container.classList.remove('loading');
                 if (typeof toast !== 'undefined') {
-                    toast.error('Ошибка парсинга JSON: ' + error.message);
+                    toast.error('Ошибка сохранения: ' + error.message);
                 } else {
-                    showStatus('Ошибка парсинга JSON: ' + error.message, 'error');
+                    showStatus('Ошибка сохранения: ' + error.message, 'error');
                 }
             }
+        }
+
+        // Поиск по глоссарию
+        function filterGlossary() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
+            
+            if (!searchTerm) {
+                renderTable();
+                return;
+            }
+            
+            const filtered = flatGlossary.filter(item => {
+                const pathMatch = item.pathString.toLowerCase().includes(searchTerm);
+                const matchMatch = item.match && (
+                    Array.isArray(item.match) 
+                        ? item.match.some(m => m.toLowerCase().includes(searchTerm))
+                        : item.match.toLowerCase().includes(searchTerm)
+                );
+                const unitMatch = item.unit && (
+                    Array.isArray(item.unit)
+                        ? item.unit.some(u => u.toLowerCase().includes(searchTerm))
+                        : item.unit.toLowerCase().includes(searchTerm)
+                );
+                
+                return pathMatch || matchMatch || unitMatch;
+            });
+            
+            renderTable(filtered);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         function showStatus(message, type) {
@@ -250,4 +586,3 @@
     </script>
 </body>
 </html>
-

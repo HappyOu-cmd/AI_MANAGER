@@ -10,6 +10,51 @@ import json
 from app.config import Config
 from app.models.db import db
 
+
+def normalize_glossary(obj):
+    """Нормализует глоссарий: пустые массивы и пустые строки -> null"""
+    if isinstance(obj, dict):
+        result = {}
+        for key, value in obj.items():
+            if isinstance(value, dict):
+                # Проверяем, является ли это конечным узлом (есть match или unit)
+                if 'match' in value or 'unit' in value:
+                    normalized_value = {}
+                    # Нормализуем match
+                    if 'match' in value:
+                        if isinstance(value['match'], list):
+                            # Убираем пустые строки
+                            match_filtered = [m for m in value['match'] if m and str(m).strip()]
+                            normalized_value['match'] = match_filtered if match_filtered else None
+                        elif isinstance(value['match'], str):
+                            normalized_value['match'] = value['match'].strip() if value['match'].strip() else None
+                        else:
+                            normalized_value['match'] = value['match']
+                    else:
+                        normalized_value['match'] = None
+                    
+                    # Нормализуем unit
+                    if 'unit' in value:
+                        if isinstance(value['unit'], list):
+                            # Убираем пустые строки
+                            unit_filtered = [u for u in value['unit'] if u and str(u).strip()]
+                            normalized_value['unit'] = unit_filtered if unit_filtered else None
+                        elif isinstance(value['unit'], str):
+                            normalized_value['unit'] = value['unit'].strip() if value['unit'].strip() else None
+                        else:
+                            normalized_value['unit'] = value['unit']
+                    else:
+                        normalized_value['unit'] = None
+                    
+                    result[key] = normalized_value
+                else:
+                    # Промежуточный узел, продолжаем рекурсию
+                    result[key] = normalize_glossary(value)
+            else:
+                result[key] = value
+        return result
+    return obj
+
 bp = Blueprint('glossary', __name__, url_prefix='/glossary')
 
 
@@ -60,6 +105,9 @@ def save_glossary():
             return jsonify({'error': 'Неверный формат данных'}), 400
         
         glossary = data['glossary']
+        
+        # Нормализация данных: пустые массивы и пустые строки -> null
+        glossary = normalize_glossary(glossary)
         
         # Валидация JSON
         json.dumps(glossary)  # Проверка на валидность
