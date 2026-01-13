@@ -161,25 +161,48 @@ def save_glossary():
             except (subprocess.SubprocessError, FileNotFoundError):
                 pass
         
-        try:
-            with open(glossary_file, 'w', encoding='utf-8') as f:
-                json.dump(glossary, f, ensure_ascii=False, indent=2)
-            
-            # Устанавливаем правильные права после записи
+        # Пытаемся записать файл с обработкой ошибок доступа
+        max_retries = 2
+        for attempt in range(max_retries):
             try:
-                os.chown(glossary_file, aimanager_uid, aimanager_gid)
-                os.chmod(glossary_file, 0o664)
-            except (OSError, NameError):
-                try:
-                    subprocess.run(['chown', 'aimanager:aimanager', str(glossary_file)], check=False, timeout=5)
-                    subprocess.run(['chmod', '664', str(glossary_file)], check=False, timeout=5)
-                except (subprocess.SubprocessError, FileNotFoundError):
-                    pass
+                with open(glossary_file, 'w', encoding='utf-8') as f:
+                    json.dump(glossary, f, ensure_ascii=False, indent=2)
                 
-        except PermissionError as e:
-            return jsonify({
-                'error': f'Ошибка доступа к файлу: {str(e)}. Обратитесь к администратору сервера для исправления прав доступа.'
-            }), 500
+                # Устанавливаем правильные права после записи
+                try:
+                    os.chown(glossary_file, aimanager_uid, aimanager_gid)
+                    os.chmod(glossary_file, 0o664)
+                except (OSError, NameError):
+                    try:
+                        subprocess.run(['chown', 'aimanager:aimanager', str(glossary_file)], check=False, timeout=5)
+                        subprocess.run(['chmod', '664', str(glossary_file)], check=False, timeout=5)
+                    except (subprocess.SubprocessError, FileNotFoundError):
+                        pass
+                
+                # Если дошли сюда, запись успешна
+                break
+                
+            except PermissionError as e:
+                if attempt < max_retries - 1:
+                    # Пробуем исправить права и повторить
+                    try:
+                        subprocess.run(['chown', 'aimanager:aimanager', str(glossary_file)], check=False, timeout=5)
+                        subprocess.run(['chmod', '664', str(glossary_file)], check=False, timeout=5)
+                        subprocess.run(['chown', 'aimanager:aimanager', str(glossary_file.parent)], check=False, timeout=5)
+                        subprocess.run(['chmod', '775', str(glossary_file.parent)], check=False, timeout=5)
+                        # Продолжаем цикл для повторной попытки
+                        continue
+                    except (subprocess.SubprocessError, FileNotFoundError):
+                        pass
+                
+                # Если все попытки исчерпаны, возвращаем ошибку
+                return jsonify({
+                    'error': f'Ошибка доступа к файлу: {str(e)}. Обратитесь к администратору сервера для исправления прав доступа.'
+                }), 500
+            except Exception as e:
+                return jsonify({
+                    'error': f'Ошибка сохранения файла: {str(e)}'
+                }), 500
         
         # Логируем действие
         try:
