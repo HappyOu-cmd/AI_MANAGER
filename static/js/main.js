@@ -297,11 +297,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 ai_provider: aiProvider
             });
             
-            // Запускаем запрос
-            const response = await fetch('/upload', {
-                method: 'POST',
-                body: formData
-            });
+            // Создаем AbortController для управления таймаутом
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 минут таймаут
+            
+            // Запускаем запрос с таймаутом
+            let response;
+            try {
+                response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData,
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+            } catch (fetchError) {
+                clearTimeout(timeoutId);
+                if (fetchError.name === 'AbortError') {
+                    throw new Error('Запрос превысил максимальное время ожидания (5 минут). Обработка может продолжаться на сервере. Проверьте статус через "Мои документы".');
+                }
+                throw fetchError;
+            }
             
             console.log('📥 Получен ответ:', response.status, response.statusText);
             
@@ -373,13 +388,32 @@ document.addEventListener('DOMContentLoaded', function() {
             // Обрабатываем сетевые ошибки и ошибки парсинга
             let errorMsg = 'Ошибка сети: ' + error.message;
             
-            if (error.message.includes('JSON')) {
+            if (error.name === 'AbortError' || error.message.includes('превысил максимальное время')) {
+                errorMsg = error.message || 'Запрос превысил максимальное время ожидания. Обработка может продолжаться на сервере. Проверьте статус через "Мои документы".';
+            } else if (error.message.includes('JSON')) {
                 errorMsg = 'Ошибка парсинга ответа сервера. Возможно, сервер вернул HTML вместо JSON. Проверьте консоль браузера.';
-            } else if (error.message.includes('Failed to fetch')) {
-                errorMsg = 'Не удалось подключиться к серверу. Убедитесь, что сервер запущен.';
+            } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                errorMsg = 'Не удалось подключиться к серверу. Возможные причины:\n' +
+                          '• Сервер временно недоступен\n' +
+                          '• Проблемы с сетью\n' +
+                          '• Таймаут соединения\n\n' +
+                          'Попробуйте обновить страницу или проверьте статус через "Мои документы".';
+            } else if (error.message.includes('timeout') || error.message.includes('Timeout')) {
+                errorMsg = 'Превышено время ожидания ответа от сервера. Обработка может продолжаться на сервере. Проверьте статус через "Мои документы".';
             }
             
             console.error('Ошибка запроса:', error);
+            console.error('Детали ошибки:', {
+                name: error.name,
+                message: error.message,
+                stack: error.stack
+            });
+            
+            // Показываем toast-уведомление
+            if (typeof toast !== 'undefined') {
+                toast.error(errorMsg);
+            }
+            
             showError(errorMsg);
         } finally {
             // Кнопка будет восстановлена после завершения обработки через polling
@@ -417,7 +451,26 @@ document.addEventListener('DOMContentLoaded', function() {
         // Функция для обновления статуса
         const updateStatus = async () => {
             try {
-                const response = await fetch(`/api/status/${taskId}`);
+                // Создаем AbortController для polling запросов
+                const pollController = new AbortController();
+                const pollTimeout = setTimeout(() => pollController.abort(), 10000); // 10 секунд для polling
+                
+                let response;
+                try {
+                    response = await fetch(`/api/status/${taskId}`, {
+                        signal: pollController.signal
+                    });
+                    clearTimeout(pollTimeout);
+                } catch (fetchError) {
+                    clearTimeout(pollTimeout);
+                    if (fetchError.name === 'AbortError') {
+                        console.warn('⚠️ Polling запрос превысил таймаут, продолжаем...');
+                        return; // Пропускаем этот запрос, следующий попробует снова
+                    }
+                    console.error('Ошибка polling:', fetchError);
+                    return; // Пропускаем этот запрос
+                }
+                
                 if (response.ok) {
                     const status = await response.json();
                     console.log('📊 Статус обновлен:', status.stage, status.message, status.progress + '%');
