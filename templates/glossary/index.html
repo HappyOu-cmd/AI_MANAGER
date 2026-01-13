@@ -444,19 +444,23 @@
                 `;
             }
             
+            // Генерируем уникальные индексы для каждого элемента
             return `
                 <div class="array-editor">
-                    ${array.map((item, idx) => `
+                    ${array.map((item, idx) => {
+                        const uniqueIndex = `${rowId}-${field}-${idx}-${Date.now()}`;
+                        return `
                         <div class="array-item">
                             <input type="text" 
                                    value="${escapeHtml(item)}" 
                                    data-row="${rowId}" 
                                    data-field="${field}" 
-                                   data-index="${idx}"
+                                   data-index="${uniqueIndex}"
                                    onchange="markRowChanged('${rowId}')">
-                            <button onclick="removeArrayItem('${rowId}', '${field}', ${idx})">×</button>
+                            <button onclick="removeArrayItem('${rowId}', '${field}', '${uniqueIndex}')">×</button>
                         </div>
-                    `).join('')}
+                    `;
+                    }).join('')}
                     <button class="add-item-btn" onclick="addArrayItem('${rowId}', '${field}')">+ Добавить</button>
                 </div>
             `;
@@ -467,16 +471,21 @@
             const row = document.getElementById(rowId);
             const editor = row.querySelector(`.${field}-cell .array-editor`);
             
+            if (!editor) {
+                console.error('Editor not found for', rowId, field);
+                return;
+            }
+            
             // Удаляем сообщение о пустом массиве, если оно есть
             const emptyMsg = editor.querySelector('.empty-array');
             if (emptyMsg) {
                 emptyMsg.remove();
             }
             
-            // Создаем новый элемент
+            // Создаем новый элемент с уникальным индексом
             const newItem = document.createElement('div');
             newItem.className = 'array-item';
-            const uniqueIndex = Date.now(); // Уникальный индекс для нового элемента
+            const uniqueIndex = `${rowId}-${field}-${Date.now()}-${Math.random()}`;
             newItem.innerHTML = `
                 <input type="text" 
                        value="" 
@@ -485,12 +494,13 @@
                        data-index="${uniqueIndex}"
                        onchange="markRowChanged('${rowId}')"
                        placeholder="Введите значение">
-                <button onclick="removeArrayItem('${rowId}', '${field}', ${uniqueIndex})">×</button>
+                <button onclick="removeArrayItem('${rowId}', '${field}', '${uniqueIndex}')">×</button>
             `;
             
             // Находим кнопку "Добавить" и вставляем новый элемент перед ней
             const addBtn = editor.querySelector('.add-item-btn');
             if (addBtn) {
+                // Вставляем новый элемент перед кнопкой "Добавить"
                 editor.insertBefore(newItem, addBtn);
             } else {
                 // Если кнопки нет, создаем её и добавляем элемент
@@ -498,11 +508,16 @@
                 const newAddBtn = document.createElement('button');
                 newAddBtn.className = 'add-item-btn';
                 newAddBtn.textContent = '+ Добавить';
-                newAddBtn.onclick = () => addArrayItem(rowId, field);
+                newAddBtn.setAttribute('onclick', `addArrayItem('${rowId}', '${field}')`);
                 editor.appendChild(newAddBtn);
             }
             
-            newItem.querySelector('input').focus();
+            // Фокусируемся на новом поле ввода
+            const input = newItem.querySelector('input');
+            if (input) {
+                input.focus();
+            }
+            
             markRowChanged(rowId);
         }
 
@@ -510,13 +525,19 @@
         function removeArrayItem(rowId, field, index) {
             const row = document.getElementById(rowId);
             const editor = row.querySelector(`.${field}-cell .array-editor`);
+            
+            if (!editor) {
+                console.error('Editor not found for', rowId, field);
+                return;
+            }
+            
             const items = editor.querySelectorAll('.array-item');
             
             // Находим элемент для удаления по data-index
             let itemToRemove = null;
             items.forEach(item => {
                 const input = item.querySelector('input');
-                if (input && input.dataset.index == index) {
+                if (input && input.dataset.index === String(index)) {
                     itemToRemove = item;
                 }
             });
@@ -528,8 +549,6 @@
             // Если элементов не осталось, показываем пустое состояние
             const remainingItems = editor.querySelectorAll('.array-item');
             if (remainingItems.length === 0) {
-                // Сохраняем кнопку "Добавить", если она есть
-                const addBtn = editor.querySelector('.add-item-btn');
                 editor.innerHTML = `
                     <div class="empty-array">Пусто (будет сохранено как null)</div>
                     <button class="add-item-btn" onclick="addArrayItem('${rowId}', '${field}')">+ Добавить</button>
@@ -555,15 +574,15 @@
             const pathString = row.dataset.path;
             const path = pathString.split(' > ');
             
-            // Получаем значения match
-            const matchInputs = row.querySelectorAll('.match-cell input[type="text"]');
+            // Получаем значения match (только из элементов массива, не из пустых полей)
+            const matchInputs = row.querySelectorAll('.match-cell .array-item input[type="text"]');
             const matchValues = Array.from(matchInputs)
                 .map(input => input.value.trim())
                 .filter(val => val !== '');
             const match = matchValues.length > 0 ? matchValues : null;
             
-            // Получаем значения unit
-            const unitInputs = row.querySelectorAll('.unit-cell input[type="text"]');
+            // Получаем значения unit (только из элементов массива, не из пустых полей)
+            const unitInputs = row.querySelectorAll('.unit-cell .array-item input[type="text"]');
             const unitValues = Array.from(unitInputs)
                 .map(input => input.value.trim())
                 .filter(val => val !== '');
