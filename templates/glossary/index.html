@@ -467,25 +467,41 @@
             const row = document.getElementById(rowId);
             const editor = row.querySelector(`.${field}-cell .array-editor`);
             
-            if (editor.querySelector('.empty-array')) {
-                editor.innerHTML = '';
+            // Удаляем сообщение о пустом массиве, если оно есть
+            const emptyMsg = editor.querySelector('.empty-array');
+            if (emptyMsg) {
+                emptyMsg.remove();
             }
             
+            // Создаем новый элемент
             const newItem = document.createElement('div');
             newItem.className = 'array-item';
+            const uniqueIndex = Date.now(); // Уникальный индекс для нового элемента
             newItem.innerHTML = `
                 <input type="text" 
                        value="" 
                        data-row="${rowId}" 
                        data-field="${field}" 
-                       data-index="-1"
+                       data-index="${uniqueIndex}"
                        onchange="markRowChanged('${rowId}')"
                        placeholder="Введите значение">
-                <button onclick="removeArrayItem('${rowId}', '${field}', -1)">×</button>
+                <button onclick="removeArrayItem('${rowId}', '${field}', ${uniqueIndex})">×</button>
             `;
             
+            // Находим кнопку "Добавить" и вставляем новый элемент перед ней
             const addBtn = editor.querySelector('.add-item-btn');
-            editor.insertBefore(newItem, addBtn);
+            if (addBtn) {
+                editor.insertBefore(newItem, addBtn);
+            } else {
+                // Если кнопки нет, создаем её и добавляем элемент
+                editor.appendChild(newItem);
+                const newAddBtn = document.createElement('button');
+                newAddBtn.className = 'add-item-btn';
+                newAddBtn.textContent = '+ Добавить';
+                newAddBtn.onclick = () => addArrayItem(rowId, field);
+                editor.appendChild(newAddBtn);
+            }
+            
             newItem.querySelector('input').focus();
             markRowChanged(rowId);
         }
@@ -496,19 +512,24 @@
             const editor = row.querySelector(`.${field}-cell .array-editor`);
             const items = editor.querySelectorAll('.array-item');
             
-            if (index === -1) {
-                // Удаляем последний добавленный элемент
-                const lastItem = Array.from(items).find(item => item.querySelector('input').dataset.index === '-1');
-                if (lastItem) {
-                    lastItem.remove();
+            // Находим элемент для удаления по data-index
+            let itemToRemove = null;
+            items.forEach(item => {
+                const input = item.querySelector('input');
+                if (input && input.dataset.index == index) {
+                    itemToRemove = item;
                 }
-            } else {
-                items[index].remove();
+            });
+            
+            if (itemToRemove) {
+                itemToRemove.remove();
             }
             
             // Если элементов не осталось, показываем пустое состояние
             const remainingItems = editor.querySelectorAll('.array-item');
             if (remainingItems.length === 0) {
+                // Сохраняем кнопку "Добавить", если она есть
+                const addBtn = editor.querySelector('.add-item-btn');
                 editor.innerHTML = `
                     <div class="empty-array">Пусто (будет сохранено как null)</div>
                     <button class="add-item-btn" onclick="addArrayItem('${rowId}', '${field}')">+ Добавить</button>

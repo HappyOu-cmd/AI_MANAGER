@@ -127,34 +127,54 @@ def save_glossary():
         
         # Сохраняем новый глоссарий
         glossary_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Исправляем права доступа на директорию и файл
+        import os
+        import subprocess
         try:
-            # Пытаемся исправить права доступа перед сохранением
-            if glossary_file.exists():
-                import os
-                try:
-                    # Получаем текущего пользователя процесса
-                    import pwd
-                    current_uid = os.getuid()
-                    current_user_info = pwd.getpwuid(current_uid)
-                    os.chown(glossary_file, current_uid, current_user_info.pw_gid)
-                    os.chmod(glossary_file, 0o664)
-                except (OSError, KeyError, AttributeError):
-                    # Если не удалось изменить права, продолжаем попытку записи
-                    pass
+            # Получаем UID и GID пользователя aimanager
+            try:
+                import pwd
+                aimanager_user = pwd.getpwnam('aimanager')
+                aimanager_uid = aimanager_user.pw_uid
+                aimanager_gid = aimanager_user.pw_gid
+            except (KeyError, AttributeError):
+                # Если не удалось получить через pwd, используем текущего пользователя
+                aimanager_uid = os.getuid()
+                aimanager_gid = os.getgid()
             
+            # Устанавливаем права на директорию
+            os.chown(glossary_file.parent, aimanager_uid, aimanager_gid)
+            os.chmod(glossary_file.parent, 0o775)
+            
+            # Если файл существует, исправляем его права
+            if glossary_file.exists():
+                os.chown(glossary_file, aimanager_uid, aimanager_gid)
+                os.chmod(glossary_file, 0o664)
+        except (OSError, PermissionError) as e:
+            # Если не удалось изменить права через os, пробуем через chown/chmod
+            try:
+                subprocess.run(['chown', 'aimanager:aimanager', str(glossary_file)], check=False, timeout=5)
+                subprocess.run(['chmod', '664', str(glossary_file)], check=False, timeout=5)
+                subprocess.run(['chown', 'aimanager:aimanager', str(glossary_file.parent)], check=False, timeout=5)
+                subprocess.run(['chmod', '775', str(glossary_file.parent)], check=False, timeout=5)
+            except (subprocess.SubprocessError, FileNotFoundError):
+                pass
+        
+        try:
             with open(glossary_file, 'w', encoding='utf-8') as f:
                 json.dump(glossary, f, ensure_ascii=False, indent=2)
             
             # Устанавливаем правильные права после записи
             try:
-                import os
-                import pwd
-                current_uid = os.getuid()
-                current_user_info = pwd.getpwuid(current_uid)
-                os.chown(glossary_file, current_uid, current_user_info.pw_gid)
+                os.chown(glossary_file, aimanager_uid, aimanager_gid)
                 os.chmod(glossary_file, 0o664)
-            except (OSError, KeyError, AttributeError):
-                pass
+            except (OSError, NameError):
+                try:
+                    subprocess.run(['chown', 'aimanager:aimanager', str(glossary_file)], check=False, timeout=5)
+                    subprocess.run(['chmod', '664', str(glossary_file)], check=False, timeout=5)
+                except (subprocess.SubprocessError, FileNotFoundError):
+                    pass
                 
         except PermissionError as e:
             return jsonify({
