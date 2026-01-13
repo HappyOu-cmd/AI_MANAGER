@@ -76,7 +76,7 @@ def create_app(config_class=Config):
     _setup_logging(app)
     
     # Регистрируем blueprints
-    from app.routes import main, upload, download, scenarios, auth, history, logs, admin
+    from app.routes import main, upload, download, scenarios, auth, history, logs, admin, glossary, prompts
     app.register_blueprint(main.bp)
     app.register_blueprint(upload.bp)
     app.register_blueprint(download.bp)
@@ -85,6 +85,8 @@ def create_app(config_class=Config):
     app.register_blueprint(history.bp)
     app.register_blueprint(logs.bp)
     app.register_blueprint(admin.bp)
+    app.register_blueprint(glossary.bp)
+    app.register_blueprint(prompts.bp)
     
     # Регистрируем обработчики ошибок
     from app.utils.error_handlers import register_error_handlers

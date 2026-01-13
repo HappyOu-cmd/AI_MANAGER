@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Редактор промптов - ИИ Менеджер</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .editor-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+        .editor-layout {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 24px;
+        }
+        .prompts-list {
+            background: var(--white);
+            border-radius: var(--border-radius);
+            padding: 16px;
+            box-shadow: var(--shadow-sm);
+            max-height: calc(100vh - 200px);
+            overflow-y: auto;
+        }
+        .prompts-list h3 {
+            margin-bottom: 16px;
+            font-size: var(--text-lg);
+        }
+        .prompt-item {
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            transition: var(--transition);
+            border: 1px solid var(--gray-200);
+        }
+        .prompt-item:hover {
+            background: var(--gray-50);
+            border-color: var(--primary-red);
+        }
+        .prompt-item.active {
+            background: var(--primary-red-lighter);
+            border-color: var(--primary-red);
+        }
+        .prompt-item-name {
+            font-weight: var(--font-semibold);
+            margin-bottom: 4px;
+        }
+        .prompt-item-path {
+            font-size: var(--text-sm);
+            color: var(--text-light);
+        }
+        .editor-panel {
+            display: flex;
+            flex-direction: column;
+        }
+        .editor-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .editor-actions {
+            display: flex;
+            gap: 12px;
+        }
+        .prompt-editor {
+            width: 100%;
+            min-height: 600px;
+            font-family: var(--font-mono);
+            font-size: 14px;
+            padding: 16px;
+            border: 1px solid var(--gray-300);
+            border-radius: var(--border-radius);
+            background: var(--white);
+            resize: vertical;
+        }
+        .prompt-editor:focus {
+            outline: none;
+            border-color: var(--primary-red);
+            box-shadow: 0 0 0 3px var(--primary-red-lighter);
+        }
+        .status-message {
+            margin-top: 16px;
+            padding: 12px;
+            border-radius: var(--border-radius);
+            display: none;
+        }
+        .status-message.success {
+            background: var(--success-lighter);
+            border-left: 4px solid var(--success);
+            color: var(--text-dark);
+            display: block;
+        }
+        .status-message.error {
+            background: var(--error-lighter);
+            border-left: 4px solid var(--error);
+            color: var(--text-dark);
+            display: block;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 48px;
+            color: var(--text-light);
+        }
+        @media (max-width: 768px) {
+            .editor-layout {
+                grid-template-columns: 1fr;
+            }
+            .prompts-list {
+                max-height: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="editor-container">
+        <div class="editor-header" style="margin-bottom: 24px;">
+            <div>
+                <h1>Редактор промптов</h1>
+                <p style="color: var(--text-light); margin-top: 8px;">Редактирование промптов для обработки ТЗ</p>
+            </div>
+        </div>
+
+        <div class="editor-layout">
+            <div class="prompts-list">
+                <h3>Список промптов</h3>
+                <div id="promptsList">
+                    <div class="empty-state">Загрузка...</div>
+                </div>
+            </div>
+
+            <div class="editor-panel">
+                <div class="card">
+                    <div class="editor-header">
+                        <div>
+                            <h3 id="currentPromptName">Выберите промпт для редактирования</h3>
+                            <p id="currentPromptPath" style="color: var(--text-light); font-size: var(--text-sm); margin-top: 4px;"></p>
+                        </div>
+                        <div class="editor-actions">
+                            <button class="btn btn-primary" onclick="savePrompt()" id="saveBtn" disabled>
+                                <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;">
+                                    <path d="M19 12V19H5V12H3V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V12H19ZM13 12.67L15.59 10.09L17 11.5L12 16.5L7 11.5L8.41 10.09L11 12.67V3H13V12.67Z" fill="currentColor"/>
+                                </svg>
+                                Сохранить
+                            </button>
+                        </div>
+                    </div>
+                    <textarea id="promptEditor" class="prompt-editor" placeholder="Выберите промпт из списка слева" disabled></textarea>
+                    <div id="statusMessage" class="status-message"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/toast.js') }}"></script>
+    <script>
+        let prompts = [];
+        let currentPrompt = null;
+        let originalContent = '';
+
+        // Загрузка списка промптов
+        async function loadPrompts() {
+            try {
+                const response = await fetch('/prompts/api/list');
+                const data = await response.json();
+                
+                if (data.success) {
+                    prompts = data.prompts;
+                    renderPromptsList();
+                } else {
+                    showError('Ошибка загрузки списка промптов: ' + data.error);
+                }
+            } catch (error) {
+                showError('Ошибка загрузки списка промптов: ' + error.message);
+            }
+        }
+
+        // Отображение списка промптов
+        function renderPromptsList() {
+            const listDiv = document.getElementById('promptsList');
+            
+            if (prompts.length === 0) {
+                listDiv.innerHTML = '<div class="empty-state">Промпты не найдены</div>';
+                return;
+            }
+            
+            listDiv.innerHTML = prompts.map((prompt, index) => `
+                <div class="prompt-item" onclick="loadPrompt('${prompt.path}')" data-path="${prompt.path}">
+                    <div class="prompt-item-name">${prompt.name}</div>
+                    <div class="prompt-item-path">${prompt.path}</div>
+                </div>
+            `).join('');
+        }
+
+        // Загрузка промпта
+        async function loadPrompt(path) {
+            try {
+                // Убираем активный класс со всех элементов
+                document.querySelectorAll('.prompt-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                
+                // Добавляем активный класс к выбранному элементу
+                const item = document.querySelector(`[data-path="${path}"]`);
+                if (item) {
+                    item.classList.add('active');
+                }
+                
+                const response = await fetch(`/prompts/api/get?path=${encodeURIComponent(path)}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentPrompt = path;
+                    originalContent = data.content;
+                    document.getElementById('promptEditor').value = data.content;
+                    document.getElementById('promptEditor').disabled = false;
+                    document.getElementById('saveBtn').disabled = false;
+                    document.getElementById('currentPromptName').textContent = prompts.find(p => p.path === path)?.name || path;
+                    document.getElementById('currentPromptPath').textContent = path;
+                } else {
+                    showError('Ошибка загрузки промпта: ' + data.error);
+                }
+            } catch (error) {
+                showError('Ошибка загрузки промпта: ' + error.message);
+            }
+        }
+
+        // Сохранение промпта
+        async function savePrompt() {
+            if (!currentPrompt) {
+                showError('Промпт не выбран');
+                return;
+            }
+            
+            const editor = document.getElementById('promptEditor');
+            const content = editor.value;
+            
+            if (content === originalContent) {
+                if (typeof toast !== 'undefined') {
+                    toast.info('Изменений не обнаружено');
+                }
+                return;
+            }
+            
+            try {
+                const response = await fetch('/prompts/api/save', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        path: currentPrompt,
+                        content: content
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    originalContent = content;
+                    if (typeof toast !== 'undefined') {
+                        toast.success('Промпт успешно сохранен');
+                    } else {
+                        showStatus('Промпт успешно сохранен', 'success');
+                    }
+                } else {
+                    if (typeof toast !== 'undefined') {
+                        toast.error('Ошибка сохранения: ' + data.error);
+                    } else {
+                        showStatus('Ошибка сохранения: ' + data.error, 'error');
+                    }
+                }
+            } catch (error) {
+                if (typeof toast !== 'undefined') {
+                    toast.error('Ошибка сохранения: ' + error.message);
+                } else {
+                    showStatus('Ошибка сохранения: ' + error.message, 'error');
+                }
+            }
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.textContent = message;
+            statusDiv.className = 'status-message ' + type;
+            setTimeout(() => {
+                statusDiv.classList.remove('show');
+            }, 5000);
+        }
+
+        function showError(message) {
+            if (typeof toast !== 'undefined') {
+                toast.error(message);
+            } else {
+                showStatus(message, 'error');
+            }
+        }
+
+        // Загружаем список промптов при загрузке страницы
+        loadPrompts();
+    </script>
+</body>
+</html>
+
