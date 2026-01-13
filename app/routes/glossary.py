@@ -79,13 +79,18 @@ def save_glossary():
             json.dump(glossary, f, ensure_ascii=False, indent=2)
         
         # Логируем действие
-        ActivityLog.log_activity(
-            user_id=current_user.id,
-            username=current_user.username,
-            ip_address=request.remote_addr,
-            action='glossary_updated',
-            details='Глоссарий обновлен'
-        )
+        try:
+            ActivityLog.log_activity(
+                user_id=current_user.id,
+                username=current_user.username,
+                ip_address=request.remote_addr,
+                action='glossary_updated',
+                details='Глоссарий обновлен'
+            )
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            # Не прерываем сохранение глоссария из-за ошибки логирования
         
         return jsonify({
             'success': True,

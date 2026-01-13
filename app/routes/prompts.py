@@ -122,13 +122,18 @@ def save_prompt():
             f.write(content)
         
         # Логируем действие
-        ActivityLog.log_activity(
-            user_id=current_user.id,
-            username=current_user.username,
-            ip_address=request.remote_addr,
-            action='prompt_updated',
-            details=f'Промпт обновлен: {path}'
-        )
+        try:
+            ActivityLog.log_activity(
+                user_id=current_user.id,
+                username=current_user.username,
+                ip_address=request.remote_addr,
+                action='prompt_updated',
+                details=f'Промпт обновлен: {path}'
+            )
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            # Не прерываем сохранение промпта из-за ошибки логирования
         
         return jsonify({
             'success': True,
@@ -171,13 +176,18 @@ def create_prompt():
             f.write(content)
         
         # Логируем действие
-        ActivityLog.log_activity(
-            user_id=current_user.id,
-            username=current_user.username,
-            ip_address=request.remote_addr,
-            action='prompt_created',
-            details=f'Промпт создан: {path}'
-        )
+        try:
+            ActivityLog.log_activity(
+                user_id=current_user.id,
+                username=current_user.username,
+                ip_address=request.remote_addr,
+                action='prompt_created',
+                details=f'Промпт создан: {path}'
+            )
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            # Не прерываем создание промпта из-за ошибки логирования
         
         return jsonify({
             'success': True,
@@ -215,13 +225,18 @@ def delete_prompt():
         prompt_file.unlink()
         
         # Логируем действие
-        ActivityLog.log_activity(
-            user_id=current_user.id,
-            username=current_user.username,
-            ip_address=request.remote_addr,
-            action='prompt_deleted',
-            details=f'Промпт удален: {path}'
-        )
+        try:
+            ActivityLog.log_activity(
+                user_id=current_user.id,
+                username=current_user.username,
+                ip_address=request.remote_addr,
+                action='prompt_deleted',
+                details=f'Промпт удален: {path}'
+            )
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            # Не прерываем удаление промпта из-за ошибки логирования
         
         return jsonify({
             'success': True,
