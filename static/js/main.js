@@ -443,24 +443,13 @@ document.addEventListener('DOMContentLoaded', function() {
         // Функция для обновления статуса
         const updateStatus = async () => {
             try {
-                // Создаем AbortController для polling запросов
-                const pollController = new AbortController();
-                const pollTimeout = setTimeout(() => pollController.abort(), 10000); // 10 секунд для polling
-                
+                // Polling запрос (без таймаута на клиенте)
                 let response;
                 try {
-                    response = await fetch(`/api/status/${taskId}`, {
-                        signal: pollController.signal
-                    });
-                    clearTimeout(pollTimeout);
+                    response = await fetch(`/api/status/${taskId}`);
                 } catch (fetchError) {
-                    clearTimeout(pollTimeout);
-                    if (fetchError.name === 'AbortError') {
-                        console.warn('⚠️ Polling запрос превысил таймаут, продолжаем...');
-                        return; // Пропускаем этот запрос, следующий попробует снова
-                    }
-                    console.error('Ошибка polling:', fetchError);
-                    return; // Пропускаем этот запрос
+                    console.warn('⚠️ Ошибка polling запроса:', fetchError);
+                    return; // Пропускаем этот запрос, следующий попробует снова
                 }
                 
                 if (response.ok) {
