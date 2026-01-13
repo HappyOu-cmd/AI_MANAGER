@@ -297,24 +297,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 ai_provider: aiProvider
             });
             
-            // Создаем AbortController для управления таймаутом
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 минут таймаут
-            
-            // Запускаем запрос с таймаутом
+            // Запускаем запрос (без таймаута на клиенте, так как обработка может быть долгой)
+            // Таймауты настроены на сервере (nginx: 1200s, gunicorn: 2400s)
             let response;
             try {
                 response = await fetch('/upload', {
                     method: 'POST',
-                    body: formData,
-                    signal: controller.signal
+                    body: formData
                 });
-                clearTimeout(timeoutId);
             } catch (fetchError) {
-                clearTimeout(timeoutId);
-                if (fetchError.name === 'AbortError') {
-                    throw new Error('Запрос превысил максимальное время ожидания (5 минут). Обработка может продолжаться на сервере. Проверьте статус через "Мои документы".');
-                }
+                // Обрабатываем только реальные сетевые ошибки, не таймауты
                 throw fetchError;
             }
             
