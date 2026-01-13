@@ -116,15 +116,24 @@ def save_glossary():
         glossary_file = Config.GLOSSARY_FILE
         if glossary_file.exists():
             backup_file = glossary_file.with_suffix('.json.backup')
-            with open(glossary_file, 'r', encoding='utf-8') as f:
-                backup_content = f.read()
-            with open(backup_file, 'w', encoding='utf-8') as f:
-                f.write(backup_content)
+            try:
+                with open(glossary_file, 'r', encoding='utf-8') as f:
+                    backup_content = f.read()
+                with open(backup_file, 'w', encoding='utf-8') as f:
+                    f.write(backup_content)
+            except Exception as e:
+                # Если не удалось создать резервную копию, продолжаем
+                pass
         
         # Сохраняем новый глоссарий
         glossary_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(glossary_file, 'w', encoding='utf-8') as f:
-            json.dump(glossary, f, ensure_ascii=False, indent=2)
+        try:
+            with open(glossary_file, 'w', encoding='utf-8') as f:
+                json.dump(glossary, f, ensure_ascii=False, indent=2)
+        except PermissionError as e:
+            return jsonify({
+                'error': f'Ошибка доступа к файлу: {str(e)}. Убедитесь, что файл принадлежит пользователю приложения.'
+            }), 500
         
         # Логируем действие
         try:
