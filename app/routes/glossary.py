@@ -128,11 +128,37 @@ def save_glossary():
         # Сохраняем новый глоссарий
         glossary_file.parent.mkdir(parents=True, exist_ok=True)
         try:
+            # Пытаемся исправить права доступа перед сохранением
+            if glossary_file.exists():
+                import os
+                try:
+                    # Получаем текущего пользователя процесса
+                    import pwd
+                    current_uid = os.getuid()
+                    current_user_info = pwd.getpwuid(current_uid)
+                    os.chown(glossary_file, current_uid, current_user_info.pw_gid)
+                    os.chmod(glossary_file, 0o664)
+                except (OSError, KeyError, AttributeError):
+                    # Если не удалось изменить права, продолжаем попытку записи
+                    pass
+            
             with open(glossary_file, 'w', encoding='utf-8') as f:
                 json.dump(glossary, f, ensure_ascii=False, indent=2)
+            
+            # Устанавливаем правильные права после записи
+            try:
+                import os
+                import pwd
+                current_uid = os.getuid()
+                current_user_info = pwd.getpwuid(current_uid)
+                os.chown(glossary_file, current_uid, current_user_info.pw_gid)
+                os.chmod(glossary_file, 0o664)
+            except (OSError, KeyError, AttributeError):
+                pass
+                
         except PermissionError as e:
             return jsonify({
-                'error': f'Ошибка доступа к файлу: {str(e)}. Убедитесь, что файл принадлежит пользователю приложения.'
+                'error': f'Ошибка доступа к файлу: {str(e)}. Обратитесь к администратору сервера для исправления прав доступа.'
             }), 500
         
         # Логируем действие

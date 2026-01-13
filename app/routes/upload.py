@@ -48,13 +48,13 @@ def upload_file():
     
     current_app.logger.info(f"📥 Получен запрос /upload от пользователя {current_user.username}")
     
-    if 'file' not in request.files:
+        if 'file' not in request.files:
         current_app.logger.warning("❌ Файл не найден в запросе")
         return jsonify({'error': 'Файл не выбран'}), 400
-    
-    file = request.files['file']
-    
-    if file.filename == '':
+        
+        file = request.files['file']
+        
+        if file.filename == '':
         current_app.logger.warning("❌ Имя файла пустое")
         return jsonify({'error': 'Файл не выбран'}), 400
     
@@ -99,8 +99,8 @@ def upload_file():
                 safe_filename = f"{safe_name}.{ext_part}" if ext_part else safe_name
             # Добавляем task_id для уникальности при параллельной обработке
             filename = f"{task_id}_{safe_filename}"
-            upload_path = Path(current_app.config['UPLOAD_FOLDER']) / filename
-            file.save(str(upload_path))
+        upload_path = Path(current_app.config['UPLOAD_FOLDER']) / filename
+        file.save(str(upload_path))
             current_app.logger.info(f"✅ Файл сохранен: {upload_path}")
         
             # Шаг 2: Конвертируем документ в текст
@@ -292,16 +292,16 @@ def upload_file():
         except ValueError as e:
             if 'task_id' in locals():
                 status_manager.update_status(task_id, status='error', message=str(e))
-            return jsonify({
-                'error': str(e),
+        return jsonify({
+            'error': str(e),
                 'stage': 'ai_setup',
                 'task_id': task_id if 'task_id' in locals() else None
-            }), 500
+        }), 500
         except ImportError as e:
             if 'task_id' in locals():
                 status_manager.update_status(task_id, status='error', message=str(e))
-            return jsonify({
-                'error': str(e),
+        return jsonify({
+            'error': str(e),
                 'stage': 'ai_setup',
                 'task_id': task_id if 'task_id' in locals() else None
             }), 500

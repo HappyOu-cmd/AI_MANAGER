@@ -48,9 +48,17 @@
 
     <main class="main-content">
         <div class="container">
-            <div class="page-header">
-                <h1>Логи активности</h1>
-                <p class="subtitle">Все действия пользователей на сайте</p>
+            <div class="page-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h1>Логи активности</h1>
+                    <p class="subtitle">Все действия пользователей на сайте</p>
+                </div>
+                <button class="btn btn-danger" onclick="clearLogs()" id="clearLogsBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;">
+                        <path d="M6 19C6 20.1 6.9 21 8 21H16C17.1 21 18 20.1 18 19V7H6V19ZM19 4H15.5L14.5 3H9.5L8.5 4H5V6H19V4Z" fill="currentColor"/>
+                    </svg>
+                    Очистить все логи
+                </button>
             </div>
 
             <!-- Статистика -->
@@ -162,5 +170,56 @@
             </div>
         </div>
     </main>
+
+    <script src="{{ url_for('static', filename='js/toast.js') }}"></script>
+    <script>
+        async function clearLogs() {
+            if (!confirm('Вы уверены, что хотите удалить все логи активности? Это действие нельзя отменить.')) {
+                return;
+            }
+            
+            const btn = document.getElementById('clearLogsBtn');
+            btn.disabled = true;
+            btn.textContent = 'Очистка...';
+            
+            try {
+                const response = await fetch('/logs/api/clear', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ confirm: true })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    if (typeof toast !== 'undefined') {
+                        toast.success(`Успешно удалено ${data.deleted_count} записей логов`);
+                    }
+                    // Перезагружаем страницу через 1 секунду
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    if (typeof toast !== 'undefined') {
+                        toast.error('Ошибка: ' + data.error);
+                    } else {
+                        alert('Ошибка: ' + data.error);
+                    }
+                    btn.disabled = false;
+                    btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;"><path d="M6 19C6 20.1 6.9 21 8 21H16C17.1 21 18 20.1 18 19V7H6V19ZM19 4H15.5L14.5 3H9.5L8.5 4H5V6H19V4Z" fill="currentColor"/></svg>Очистить все логи';
+                }
+            } catch (error) {
+                if (typeof toast !== 'undefined') {
+                    toast.error('Ошибка: ' + error.message);
+                } else {
+                    alert('Ошибка: ' + error.message);
+                }
+                btn.disabled = false;
+                btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;"><path d="M6 19C6 20.1 6.9 21 8 21H16C17.1 21 18 20.1 18 19V7H6V19ZM19 4H15.5L14.5 3H9.5L8.5 4H5V6H19V4Z" fill="currentColor"/></svg>Очистить все логи';
+            }
+        }
+    </script>
 </body>
 </html>

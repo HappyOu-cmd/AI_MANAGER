@@ -131,3 +131,41 @@ def api_activity():
         'pages': pagination.pages,
         'current_page': page
     })
+
+
+@bp.route('/api/clear', methods=['POST'])
+@admin_required
+def clear_logs():
+    """API: Очистить все логи активности"""
+    try:
+        # Подтверждение через параметр
+        confirm = request.get_json().get('confirm', False) if request.is_json else False
+        
+        if not confirm:
+            return jsonify({'error': 'Требуется подтверждение'}), 400
+        
+        # Удаляем все логи
+        deleted_count = ActivityLog.query.delete()
+        db.session.commit()
+        
+        # Логируем действие очистки
+        try:
+            from app.routes.upload import log_activity
+            log_activity(
+                user_id=current_user.id,
+                username=current_user.username,
+                ip_address=request.remote_addr,
+                action='logs_cleared',
+                details=f'Очищено {deleted_count} записей логов'
+            )
+        except Exception:
+            pass
+        
+        return jsonify({
+            'success': True,
+            'message': f'Удалено {deleted_count} записей логов',
+            'deleted_count': deleted_count
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Ошибка очистки логов: {str(e)}'}), 500
