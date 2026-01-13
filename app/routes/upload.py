@@ -48,13 +48,13 @@ def upload_file():
     
     current_app.logger.info(f"📥 Получен запрос /upload от пользователя {current_user.username}")
     
-        if 'file' not in request.files:
+    if 'file' not in request.files:
         current_app.logger.warning("❌ Файл не найден в запросе")
         return jsonify({'error': 'Файл не выбран'}), 400
-        
-        file = request.files['file']
-        
-        if file.filename == '':
+    
+    file = request.files['file']
+    
+    if file.filename == '':
         current_app.logger.warning("❌ Имя файла пустое")
         return jsonify({'error': 'Файл не выбран'}), 400
     
@@ -81,27 +81,28 @@ def upload_file():
         status_manager.update_status(task_id, user_id=current_user.id)
         current_app.logger.info(f"✅ Статус создан для task_id: {task_id} (пользователь: {current_user.username})")
         
-        try:
-            # Шаг 1: Сохраняем загруженный файл
-            # Используем task_id для уникальности имен файлов при параллельной обработке
-            current_app.logger.info("📁 Шаг 1: Сохранение файла...")
-            status_manager.update_status(task_id, stage='file_upload', message='Сохранение файла...')
-            # Применяем secure_filename для безопасного имени, но сохраняем оригинальное для отображения
-            safe_filename = secure_filename(original_filename)
-            # Если secure_filename удалил все (кириллица), используем оригинальное имя с заменой небезопасных символов
-            if not safe_filename or safe_filename == original_filename.rsplit('.', 1)[-1]:
-                # Создаем безопасное имя вручную: заменяем пробелы и небезопасные символы
-                name_part = original_filename.rsplit('.', 1)[0] if '.' in original_filename else original_filename
-                ext_part = original_filename.rsplit('.', 1)[-1] if '.' in original_filename else ''
-                # Заменяем небезопасные символы на подчеркивания, но сохраняем кириллицу
-                safe_name = re.sub(r'[^\w\s\-_\.]', '_', name_part)
-                safe_name = re.sub(r'\s+', '_', safe_name)
-                safe_filename = f"{safe_name}.{ext_part}" if ext_part else safe_name
-            # Добавляем task_id для уникальности при параллельной обработке
-            filename = f"{task_id}_{safe_filename}"
+        # Шаг 1: Сохраняем загруженный файл
+        # Используем task_id для уникальности имен файлов при параллельной обработке
+        current_app.logger.info("📁 Шаг 1: Сохранение файла...")
+        status_manager.update_status(task_id, stage='file_upload', message='Сохранение файла...')
+        # Применяем secure_filename для безопасного имени, но сохраняем оригинальное для отображения
+        safe_filename = secure_filename(original_filename)
+        # Если secure_filename удалил все (кириллица), используем оригинальное имя с заменой небезопасных символов
+        if not safe_filename or safe_filename == original_filename.rsplit('.', 1)[-1]:
+            # Создаем безопасное имя вручную: заменяем пробелы и небезопасные символы
+            name_part = original_filename.rsplit('.', 1)[0] if '.' in original_filename else original_filename
+            ext_part = original_filename.rsplit('.', 1)[-1] if '.' in original_filename else ''
+            # Заменяем небезопасные символы на подчеркивания, но сохраняем кириллицу
+            safe_name = re.sub(r'[^\w\s\-_\.]', '_', name_part)
+            safe_name = re.sub(r'\s+', '_', safe_name)
+            safe_filename = f"{safe_name}.{ext_part}" if ext_part else safe_name
+        # Добавляем task_id для уникальности при параллельной обработке
+        filename = f"{task_id}_{safe_filename}"
         upload_path = Path(current_app.config['UPLOAD_FOLDER']) / filename
         file.save(str(upload_path))
-            current_app.logger.info(f"✅ Файл сохранен: {upload_path}")
+        current_app.logger.info(f"✅ Файл сохранен: {upload_path}")
+        
+        try:
         
             # Шаг 2: Конвертируем документ в текст
             current_app.logger.info("🔄 Шаг 2: Конвертация документа...")
@@ -292,16 +293,16 @@ def upload_file():
         except ValueError as e:
             if 'task_id' in locals():
                 status_manager.update_status(task_id, status='error', message=str(e))
-        return jsonify({
-            'error': str(e),
+            return jsonify({
+                'error': str(e),
                 'stage': 'ai_setup',
                 'task_id': task_id if 'task_id' in locals() else None
-        }), 500
+            }), 500
         except ImportError as e:
             if 'task_id' in locals():
                 status_manager.update_status(task_id, status='error', message=str(e))
-        return jsonify({
-            'error': str(e),
+            return jsonify({
+                'error': str(e),
                 'stage': 'ai_setup',
                 'task_id': task_id if 'task_id' in locals() else None
             }), 500
