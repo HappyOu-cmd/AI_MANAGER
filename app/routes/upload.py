@@ -102,7 +102,7 @@ def upload_file():
             upload_path = Path(current_app.config['UPLOAD_FOLDER']) / filename
             file.save(str(upload_path))
             current_app.logger.info(f"✅ Файл сохранен: {upload_path}")
-            
+        
             # Шаг 2: Конвертируем документ в текст
             current_app.logger.info("🔄 Шаг 2: Конвертация документа...")
             status_manager.update_status(task_id, stage='conversion', message='Конвертация документа в текст...')
@@ -312,7 +312,7 @@ def upload_file():
                 'error': f'Ошибка обработки ИИ: {str(e)}',
                 'stage': 'ai_processing',
                 'task_id': task_id if 'task_id' in locals() else None
-            }), 500
+        }), 500
     
     except Exception as e:
         # Пытаемся получить task_id если он был создан

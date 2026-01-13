@@ -202,11 +202,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 } else {
                     console.error('❌ Ошибка остановки обработки:', response.status);
-                    alert('Не удалось остановить обработку. Попробуйте обновить страницу.');
+                    if (typeof toast !== 'undefined') {
+                        toast.error('Не удалось остановить обработку. Попробуйте обновить страницу.');
+                    } else {
+                        alert('Не удалось остановить обработку. Попробуйте обновить страницу.');
+                    }
                 }
             } catch (error) {
                 console.error('❌ Ошибка при остановке обработки:', error);
-                alert('Ошибка при остановке обработки: ' + error.message);
+                if (typeof toast !== 'undefined') {
+                    toast.error('Ошибка при остановке обработки: ' + error.message);
+                } else {
+                    alert('Ошибка при остановке обработки: ' + error.message);
+                }
             }
         });
     }
@@ -799,6 +807,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function showError(message) {
+        // Показываем toast-уведомление
+        if (typeof toast !== 'undefined') {
+            toast.error(message);
+        }
+        
         // Восстанавливаем кнопку
         submitBtn.disabled = false;
         loader.style.display = 'none';

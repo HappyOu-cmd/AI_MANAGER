@@ -5,16 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ИИ Менеджер для заполнения ТЗ</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
+    <!-- Toast Container (будет создан автоматически через JS) -->
+    <div id="toastContainer"></div>
+    
     <!-- Кнопка меню для мобильных -->
-    <button class="menu-toggle" id="menuToggle" style="display: none;">☰</button>
+    <button class="menu-toggle" id="menuToggle" style="display: none;" aria-label="Меню">
+        <svg class="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M3 18H21V16H3V18ZM3 13H21V11H3V13ZM3 6V8H21V6H3Z" fill="currentColor"/>
+        </svg>
+    </button>
     
     <!-- Боковая панель -->
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <div class="sidebar-logo">
-                <div class="sidebar-logo-icon">🤖</div>
+                <div class="sidebar-logo-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2C13.1 2 14 2.9 14 4V6H16C17.1 6 18 6.9 18 8V18C18 19.1 17.1 20 16 20H8C6.9 20 6 19.1 6 18V8C6 6.9 6.9 6 8 6H10V4C10 2.9 10.9 2 12 2ZM12 4C11.4 4 11 4.4 11 5V6H13V5C13 4.4 12.6 4 12 4ZM8 8V18H16V8H8ZM9 10H15V12H9V10ZM9 14H15V16H9V14Z" fill="currentColor"/>
+                    </svg>
+                </div>
                 <div class="sidebar-logo-text">ИИ Менеджер</div>
             </div>
             <div class="sidebar-subtitle">Заполнение ТЗ</div>
@@ -23,25 +37,45 @@
         <nav class="sidebar-nav">
             {% if current_user.is_authenticated %}
             <a href="/" class="sidebar-nav-item active">
-                <span class="sidebar-nav-item-icon">📄</span>
+                <span class="sidebar-nav-item-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2ZM16 18H8V16H16V18ZM16 14H8V12H16V14ZM13 9V3.5L18.5 9H13Z" fill="currentColor"/>
+                    </svg>
+                </span>
                 <span>Обработка документов</span>
             </a>
             <a href="/history" class="sidebar-nav-item">
-                <span class="sidebar-nav-item-icon">📚</span>
+                <span class="sidebar-nav-item-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M10 4H4C2.9 4 2 4.9 2 6V18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V8C22 6.9 21.1 6 20 6H12L10 4Z" fill="currentColor"/>
+                    </svg>
+                </span>
                 <span>Мои документы</span>
             </a>
             {% if current_user.is_admin %}
             <a href="/admin" class="sidebar-nav-item">
-                <span class="sidebar-nav-item-icon">⚙️</span>
+                <span class="sidebar-nav-item-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M19.14 12.94C19.18 12.64 19.2 12.32 19.2 12C19.2 11.68 19.18 11.36 19.14 11.06L21.16 9.48C21.34 9.33 21.38 9.07 21.24 8.87L19.24 6.13C19.1 5.93 18.84 5.88 18.64 6.01L16.26 7.5C15.75 7.15 15.19 6.87 14.6 6.68L14.34 4.16C14.3 3.95 14.13 3.8 13.92 3.8H10.08C9.87 3.8 9.7 3.95 9.66 4.16L9.4 6.68C8.81 6.87 8.25 7.15 7.74 7.5L5.36 6.01C5.16 5.88 4.9 5.93 4.76 6.13L2.76 8.87C2.62 9.07 2.66 9.33 2.84 9.48L4.86 11.06C4.82 11.36 4.8 11.68 4.8 12C4.8 12.32 4.82 12.64 4.86 12.94L2.84 14.52C2.66 14.67 2.62 14.93 2.76 15.13L4.76 17.87C4.9 18.07 5.16 18.12 5.36 17.99L7.74 16.5C8.25 16.85 8.81 17.13 9.4 17.32L9.66 19.84C9.7 20.05 9.87 20.2 10.08 20.2H13.92C14.13 20.2 14.3 20.05 14.34 19.84L14.6 17.32C15.19 17.13 15.75 16.85 16.26 16.5L18.64 17.99C18.84 18.12 19.1 18.07 19.24 17.87L21.24 15.13C21.38 14.93 21.34 14.67 21.16 14.52L19.14 12.94ZM12 15.5C10.62 15.5 9.5 14.38 9.5 13C9.5 11.62 10.62 10.5 12 10.5C13.38 10.5 14.5 11.62 14.5 13C14.5 14.38 13.38 15.5 12 15.5Z" fill="currentColor"/>
+                    </svg>
+                </span>
                 <span>Админ панель</span>
             </a>
             <a href="/logs" class="sidebar-nav-item">
-                <span class="sidebar-nav-item-icon">📊</span>
+                <span class="sidebar-nav-item-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M3 3V21H21V19H5V3H3ZM7 17H9V10H7V17ZM11 17H13V7H11V17ZM15 17H17V13H15V17ZM19 17H21V15H19V17Z" fill="currentColor"/>
+                    </svg>
+                </span>
                 <span>Логи активности</span>
             </a>
             {% endif %}
             <a href="/scenarios" class="sidebar-nav-item">
-                <span class="sidebar-nav-item-icon">⚙️</span>
+                <span class="sidebar-nav-item-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M19.14 12.94C19.18 12.64 19.2 12.32 19.2 12C19.2 11.68 19.18 11.36 19.14 11.06L21.16 9.48C21.34 9.33 21.38 9.07 21.24 8.87L19.24 6.13C19.1 5.93 18.84 5.88 18.64 6.01L16.26 7.5C15.75 7.15 15.19 6.87 14.6 6.68L14.34 4.16C14.3 3.95 14.13 3.8 13.92 3.8H10.08C9.87 3.8 9.7 3.95 9.66 4.16L9.4 6.68C8.81 6.87 8.25 7.15 7.74 7.5L5.36 6.01C5.16 5.88 4.9 5.93 4.76 6.13L2.76 8.87C2.62 9.07 2.66 9.33 2.84 9.48L4.86 11.06C4.82 11.36 4.8 11.68 4.8 12C4.8 12.32 4.82 12.64 4.86 12.94L2.84 14.52C2.66 14.67 2.62 14.93 2.76 15.13L4.76 17.87C4.9 18.07 5.16 18.12 5.36 17.99L7.74 16.5C8.25 16.85 8.81 17.13 9.4 17.32L9.66 19.84C9.7 20.05 9.87 20.2 10.08 20.2H13.92C14.13 20.2 14.3 20.05 14.34 19.84L14.6 17.32C15.19 17.13 15.75 16.85 16.26 16.5L18.64 17.99C18.84 18.12 19.1 18.07 19.24 17.87L21.24 15.13C21.38 14.93 21.34 14.67 21.16 14.52L19.14 12.94ZM12 15.5C10.62 15.5 9.5 14.38 9.5 13C9.5 11.62 10.62 10.5 12 10.5C13.38 10.5 14.5 11.62 14.5 13C14.5 14.38 13.38 15.5 12 15.5Z" fill="currentColor"/>
+                    </svg>
+                </span>
                 <span>Сценарии</span>
             </a>
             {% endif %}
@@ -73,7 +107,11 @@
             {% if require_login %}
             <!-- Сообщение о необходимости входа -->
             <div class="card" style="text-align: center; padding: 48px;">
-                <div style="font-size: 64px; margin-bottom: 16px;">🔐</div>
+                <div style="width: 64px; height: 64px; margin: 0 auto 16px; color: var(--primary-red);">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18 8H17V6C17 3.24 14.76 1 12 1C9.24 1 7 3.24 7 6V8H6C4.9 8 4 8.9 4 10V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V10C20 8.9 19.1 8 18 8ZM12 3C13.66 3 15 4.34 15 6V8H9V6C9 4.34 10.34 3 12 3ZM18 20H6V10H18V20Z" fill="currentColor"/>
+                    </svg>
+                </div>
                 <h2 style="margin-bottom: 16px;">Требуется авторизация</h2>
                 <p style="color: var(--text-light); margin-bottom: 24px;">Для обработки документов необходимо войти в систему</p>
                 <div style="display: flex; gap: 16px; justify-content: center;">
@@ -85,14 +123,22 @@
             <!-- Карточка загрузки -->
             <div class="card upload-card">
                 <div class="card-header">
-                    <div class="card-icon">📤</div>
+                    <div class="card-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M9 16H15V10H19L12 3L5 10H9V16ZM5 18H19V20H5V18Z" fill="currentColor"/>
+                        </svg>
+                    </div>
                     <div class="card-title">Загрузка документа</div>
                 </div>
 
                 <form id="uploadForm" enctype="multipart/form-data">
                     <!-- Область загрузки -->
                     <div class="upload-area" id="uploadArea">
-                        <div class="upload-icon-large">📄</div>
+                        <div class="upload-icon-large">
+                            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2ZM16 18H8V16H16V18ZM16 14H8V12H16V14ZM13 9V3.5L18.5 9H13Z" fill="currentColor"/>
+                            </svg>
+                        </div>
                         <div class="upload-text">Перетащите файл сюда или нажмите для выбора</div>
                         <div class="upload-formats">Поддерживаемые форматы: PDF, DOC, DOCX, XLS, XLSX, TXT</div>
                         <input type="file" id="fileInput" name="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt" required style="display: none;">
@@ -105,7 +151,11 @@
                     <!-- Выбор сценария -->
                     <div class="form-group">
                         <label class="form-label" for="scenarioSelect">
-                            <span>📋</span>
+                            <span class="icon" style="width: 20px; height: 20px;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2ZM16 18H8V16H16V18ZM16 14H8V12H16V14ZM13 9V3.5L18.5 9H13Z" fill="currentColor"/>
+                                </svg>
+                            </span>
                             <span>Сценарий обработки</span>
                         </label>
                         <select id="scenarioSelect" name="scenario_id" class="form-select" required>
@@ -116,7 +166,11 @@
                             {% endfor %}
                         </select>
                         <a href="/scenarios" class="form-link">
-                            <span>⚙️</span>
+                            <span class="icon" style="width: 16px; height: 16px;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M19.14 12.94C19.18 12.64 19.2 12.32 19.2 12C19.2 11.68 19.18 11.36 19.14 11.06L21.16 9.48C21.34 9.33 21.38 9.07 21.24 8.87L19.24 6.13C19.1 5.93 18.84 5.88 18.64 6.01L16.26 7.5C15.75 7.15 15.19 6.87 14.6 6.68L14.34 4.16C14.3 3.95 14.13 3.8 13.92 3.8H10.08C9.87 3.8 9.7 3.95 9.66 4.16L9.4 6.68C8.81 6.87 8.25 7.15 7.74 7.5L5.36 6.01C5.16 5.88 4.9 5.93 4.76 6.13L2.76 8.87C2.62 9.07 2.66 9.33 2.84 9.48L4.86 11.06C4.82 11.36 4.8 11.68 4.8 12C4.8 12.32 4.82 12.64 4.86 12.94L2.84 14.52C2.66 14.67 2.62 14.93 2.76 15.13L4.76 17.87C4.9 18.07 5.16 18.12 5.36 17.99L7.74 16.5C8.25 16.85 8.81 17.13 9.4 17.32L9.66 19.84C9.7 20.05 9.87 20.2 10.08 20.2H13.92C14.13 20.2 14.3 20.05 14.34 19.84L14.6 17.32C15.19 17.13 15.75 16.85 16.26 16.5L18.64 17.99C18.84 18.12 19.1 18.07 19.24 17.87L21.24 15.13C21.38 14.93 21.34 14.67 21.16 14.52L19.14 12.94ZM12 15.5C10.62 15.5 9.5 14.38 9.5 13C9.5 11.62 10.62 10.5 12 10.5C13.38 10.5 14.5 11.62 14.5 13C14.5 14.38 13.38 15.5 12 15.5Z" fill="currentColor"/>
+                                </svg>
+                            </span>
                             <span>Управление сценариями</span>
                         </a>
                     </div>
@@ -124,7 +178,11 @@
                     <!-- Выбор AI провайдера -->
                     <div class="form-group">
                         <label class="form-label" for="aiProvider">
-                            <span>🤖</span>
+                            <span class="icon" style="width: 20px; height: 20px;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M12 2C13.1 2 14 2.9 14 4V6H16C17.1 6 18 6.9 18 8V18C18 19.1 17.1 20 16 20H8C6.9 20 6 19.1 6 18V8C6 6.9 6.9 6 8 6H10V4C10 2.9 10.9 2 12 2ZM12 4C11.4 4 11 4.4 11 5V6H13V5C13 4.4 12.6 4 12 4ZM8 8V18H16V8H8ZM9 10H15V12H9V10ZM9 14H15V16H9V14Z" fill="currentColor"/>
+                                </svg>
+                            </span>
                             <span>AI провайдер</span>
                         </label>
                         <select id="aiProvider" name="ai_provider" class="form-select">
@@ -140,7 +198,10 @@
                             <span class="loader" id="loader" style="display: none;">⏳</span>
                         </button>
                         <button type="button" class="btn btn-danger" id="cancelBtn" style="display: none;" title="Остановить обработку">
-                            ⏹️ Остановить
+                            <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;">
+                                <path d="M6 6H18V18H6V6Z" fill="currentColor"/>
+                            </svg>
+                            Остановить
                         </button>
                     </div>
 
@@ -153,33 +214,60 @@
                         
                         <div class="progress-steps">
                             <div class="step" id="step_conversion">
-                                <div class="step-icon">📄</div>
+                                <div class="step-icon">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2ZM16 18H8V16H16V18ZM16 14H8V12H16V14ZM13 9V3.5L18.5 9H13Z" fill="currentColor"/>
+                                    </svg>
+                                </div>
                                 <div class="step-text">Конвертация документа...</div>
                             </div>
                             <div class="step" id="step_main">
-                                <div class="step-icon">🤖</div>
+                                <div class="step-icon">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M12 2C13.1 2 14 2.9 14 4V6H16C17.1 6 18 6.9 18 8V18C18 19.1 17.1 20 16 20H8C6.9 20 6 19.1 6 18V8C6 6.9 6.9 6 8 6H10V4C10 2.9 10.9 2 12 2ZM12 4C11.4 4 11 4.4 11 5V6H13V5C13 4.4 12.6 4 12 4ZM8 8V18H16V8H8ZM9 10H15V12H9V10ZM9 14H15V16H9V14Z" fill="currentColor"/>
+                                    </svg>
+                                </div>
                                 <div class="step-text">Обработка основного промпта...</div>
                             </div>
                             <div class="step" id="step_instrument_tooling" style="display: none;">
-                                <div class="step-icon">🔧</div>
+                                <div class="step-icon">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M22.7 19L13.6 9.9C14.5 7.6 14 4.9 12.1 3C10.1 1 7.1 0.6 4.7 1.7L9 6L6 9L1.6 4.7C0.4 7.1 0.9 10.1 2.9 12.1C4.8 14 7.5 14.5 9.8 13.6L18.9 22.7C19.3 23.1 19.9 23.1 20.3 22.7L22.6 20.4C23.1 20 23.1 19.3 22.7 19Z" fill="currentColor"/>
+                                    </svg>
+                                </div>
                                 <div class="step-text">Извлечение инструмента и оснастки...</div>
                             </div>
                             <div class="step" id="step_services" style="display: none;">
-                                <div class="step-icon">💼</div>
+                                <div class="step-icon">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M20 6H16V4C16 2.9 15.1 2 14 2H10C8.9 2 8 2.9 8 4V6H4C2.9 6 2 6.9 2 8V19C2 20.1 2.9 21 4 21H20C21.1 21 22 20.1 22 19V8C22 6.9 21.1 6 20 6ZM10 4H14V6H10V4ZM20 19H4V8H20V19Z" fill="currentColor"/>
+                                    </svg>
+                                </div>
                                 <div class="step-text">Извлечение услуг...</div>
                             </div>
                             <div class="step" id="step_spare_parts" style="display: none;">
-                                <div class="step-icon">📦</div>
+                                <div class="step-icon">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M12 2L2 7V10C2 16 6 21.3 12 22C18 21.3 22 16 22 10V7L12 2ZM12 4.2L19.5 8.1C19.3 13.6 16.2 18.2 12 18.7C7.8 18.2 4.7 13.6 4.5 8.1L12 4.2ZM12 20C15.8 20 19 16.2 19 12V9.3L12 5.7L5 9.3V12C5 16.2 8.2 20 12 20Z" fill="currentColor"/>
+                                    </svg>
+                                </div>
                                 <div class="step-text">Извлечение ЗИП...</div>
                             </div>
-                            <div class="step-parallel-info" style="display: none; margin-top: 10px; padding: 10px; background: #f0f0f0; border-radius: 5px; font-size: 0.9em; color: #666;">
-                                ⚡ Параллельная обработка: инструмент+оснастка, услуги, ЗИП
+                            <div class="step-parallel-info" style="display: none; margin-top: 10px; padding: 10px; background: #f0f0f0; border-radius: 5px; font-size: 0.9em; color: #666; display: flex; align-items: center; gap: 8px;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" fill="currentColor"/>
+                                </svg>
+                                Параллельная обработка: инструмент+оснастка, услуги, ЗИП
                             </div>
                         </div>
                         
                         <div class="metrics-card" id="metricsBox" style="display: none;">
                             <div class="metrics-title">
-                                <span>📊</span>
+                                <span class="icon" style="width: 20px; height: 20px;">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M3 3V21H21V19H5V3H3ZM7 17H9V10H7V17ZM11 17H13V7H11V17ZM15 17H17V13H15V17ZM19 17H21V15H19V17Z" fill="currentColor"/>
+                                    </svg>
+                                </span>
                                 <span>Метрики обработки</span>
                             </div>
                             <div id="metricsContainer"></div>
@@ -191,7 +279,11 @@
 
             <!-- Результаты -->
             <div class="card result-card" id="resultSection" style="display: none;">
-                <div class="result-icon-large">✅</div>
+                <div class="result-icon-large" style="width: 64px; height: 64px; margin: 0 auto 16px; color: var(--success);">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z" fill="currentColor"/>
+                    </svg>
+                </div>
                 <div class="result-title">ТЗ успешно заполнено!</div>
                 <p id="resultMessage" style="color: var(--text-light); margin-bottom: 24px;"></p>
                 
@@ -204,7 +296,11 @@
 
             <!-- Ошибки -->
             <div class="card error-card" id="errorBox" style="display: none;">
-                <div class="error-icon-large">❌</div>
+                <div class="error-icon-large" style="width: 64px; height: 64px; margin: 0 auto 16px; color: var(--error);">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM13 17H11V15H13V17ZM13 13H11V7H13V13Z" fill="currentColor"/>
+                    </svg>
+                </div>
                 <div class="error-title">Ошибка обработки</div>
                 <p id="errorMessage" style="color: var(--text-light);"></p>
             </div>
@@ -212,7 +308,11 @@
             <!-- Информационная карточка -->
             <div class="card info-card">
                 <div class="card-header">
-                    <div class="card-icon">ℹ️</div>
+                    <div class="card-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM13 17H11V15H13V17ZM13 13H11V7H13V13Z" fill="currentColor"/>
+                        </svg>
+                    </div>
                     <div class="card-title">Поддерживаемые форматы</div>
                 </div>
                 
@@ -239,6 +339,9 @@
         </div>
     </main>
 
+    <script src="{{ url_for('static', filename='js/icons.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/toast.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/skeleton.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>

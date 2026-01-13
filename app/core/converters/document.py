@@ -82,32 +82,166 @@ class DocumentConverter(BaseConverter):
         return "\n".join(text_content)
     
     def convert_docx(self, file_path: str) -> str:
-        """Конвертирует DOCX в текст"""
+        """Конвертирует DOCX в текст с извлечением из всех элементов"""
         try:
             from docx import Document
+            from docx.oxml.text.paragraph import CT_P
+            from docx.oxml.table import CT_Tbl
+            from docx.oxml.text.run import CT_R
         except ImportError:
             raise ImportError("Для работы с DOCX установите: pip install python-docx")
         
-        doc = Document(file_path)
+        try:
+            doc = Document(file_path)
+        except Exception as e:
+            raise RuntimeError(f"Не удалось открыть DOCX файл: {e}")
+        
         text_content = []
         
-        for paragraph in doc.paragraphs:
-            if paragraph.text.strip():
-                text_content.append(paragraph.text)
+        # Функция для извлечения текста из элемента (включая вложенные элементы)
+        def extract_text_from_element(element):
+            """Рекурсивно извлекает весь текст из элемента"""
+            text_parts = []
+            
+            # Если это параграф
+            if hasattr(element, 'text'):
+                if element.text and element.text.strip():
+                    text_parts.append(element.text.strip())
+            
+            # Извлекаем текст из всех дочерних элементов
+            if hasattr(element, '__iter__'):
+                for child in element:
+                    child_text = extract_text_from_element(child)
+                    if child_text:
+                        text_parts.append(child_text)
+            
+            # Для runs (фрагментов текста) извлекаем текст напрямую
+            if hasattr(element, 'runs'):
+                for run in element.runs:
+                    if run.text and run.text.strip():
+                        text_parts.append(run.text.strip())
+            
+            return ' '.join(text_parts) if text_parts else ''
         
-        # Извлекаем текст из таблиц
+        # Извлекаем текст из всех параграфов (включая заголовки и подзаголовки)
+        for paragraph in doc.paragraphs:
+            para_text = paragraph.text.strip()
+            if para_text:
+                text_content.append(para_text)
+            
+            # Дополнительно извлекаем текст из runs (на случай, если paragraph.text не работает)
+            if not para_text:
+                runs_text = []
+                for run in paragraph.runs:
+                    if run.text and run.text.strip():
+                        runs_text.append(run.text.strip())
+                if runs_text:
+                    text_content.append(' '.join(runs_text))
+        
+        # Извлекаем текст из таблиц (более детально)
         for table in doc.tables:
             text_content.append("\n--- Таблица ---\n")
-            for row in table.rows:
+            for row_idx, row in enumerate(table.rows):
                 row_text = []
                 for cell in row.cells:
-                    if cell.text.strip():
-                        row_text.append(cell.text.strip())
-                if row_text:
+                    # Извлекаем текст из всех параграфов ячейки
+                    cell_text_parts = []
+                    for para in cell.paragraphs:
+                        if para.text.strip():
+                            cell_text_parts.append(para.text.strip())
+                    # Если параграфы пустые, пробуем извлечь напрямую
+                    if not cell_text_parts:
+                        cell_text = cell.text.strip()
+                        if cell_text:
+                            cell_text_parts.append(cell_text)
+                    
+                    if cell_text_parts:
+                        row_text.append(' '.join(cell_text_parts))
+                    else:
+                        row_text.append("")
+                
+                if any(row_text):  # Добавляем строку, если есть хотя бы одна непустая ячейка
                     text_content.append(" | ".join(row_text))
             text_content.append("\n")
         
-        return "\n".join(text_content)
+        # Извлекаем текст из заголовков и подвалов (headers/footers)
+        try:
+            for section in doc.sections:
+                # Заголовок
+                if section.header:
+                    header_texts = []
+                    for para in section.header.paragraphs:
+                        if para.text.strip():
+                            header_texts.append(para.text.strip())
+                    if header_texts:
+                        text_content.append(f"\n--- Заголовок ---\n")
+                        text_content.extend(header_texts)
+                        text_content.append("\n")
+                
+                # Подвал
+                if section.footer:
+                    footer_texts = []
+                    for para in section.footer.paragraphs:
+                        if para.text.strip():
+                            footer_texts.append(para.text.strip())
+                    if footer_texts:
+                        text_content.append(f"\n--- Подвал ---\n")
+                        text_content.extend(footer_texts)
+                        text_content.append("\n")
+        except Exception as e:
+            # Если не удалось извлечь заголовки/подвалы, продолжаем
+            pass
+        
+        # Извлекаем текст из всех элементов документа (fallback метод)
+        # Это может помочь, если текст находится в нестандартных местах
+        try:
+            # Получаем все XML элементы документа
+            body = doc.element.body
+            for element in body:
+                if isinstance(element, CT_P):
+                    # Это параграф - уже обработали выше
+                    continue
+                elif isinstance(element, CT_Tbl):
+                    # Это таблица - уже обработали выше
+                    continue
+                else:
+                    # Пробуем извлечь текст из других элементов
+                    element_text = extract_text_from_element(element)
+                    if element_text and element_text.strip():
+                        text_content.append(element_text.strip())
+        except Exception as e:
+            # Если не удалось, продолжаем без этого метода
+            pass
+        
+        result = "\n".join(text_content)
+        
+        # Если результат пустой, пробуем альтернативный метод
+        if not result.strip():
+            # Пробуем извлечь весь текст через XML
+            try:
+                import zipfile
+                import xml.etree.ElementTree as ET
+                
+                with zipfile.ZipFile(file_path, 'r') as zip_file:
+                    # Читаем основной документ
+                    if 'word/document.xml' in zip_file.namelist():
+                        xml_content = zip_file.read('word/document.xml')
+                        root = ET.fromstring(xml_content)
+                        
+                        # Находим все текстовые элементы
+                        namespace = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
+                        text_elements = root.findall('.//w:t', namespace)
+                        
+                        if text_elements:
+                            text_parts = []
+                            for elem in text_elements:
+                                if elem.text:
+                                    text_parts.append(elem.text)
+                            result = '\n'.join(text_parts)
+            except Exception as e:
+                pass
+        
+        return result
     
     def convert_doc(self, file_path: str) -> str:
         """Конвертирует DOC (старый формат Word) в текст"""
